@@ -42,6 +42,7 @@ import {
   fakeCredentialId,
   fakeTxHash,
   login,
+  register,
 } from '../lib/api';
 import { buildCertificateBytes, computeSha256Hex, downloadCertificatePdf } from '../lib/generateCertificatePdf';
 import { REFERENCE_INSTITUTION } from '../lib/institution';
@@ -64,10 +65,22 @@ export default function AdminConsole() {
 function AdminLogin() {
   const { setAdminAuthed } = useAuth();
   const { notify } = useToast();
+  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const isRegister = mode === 'register';
+
+  const switchMode = () => {
+    setMode(isRegister ? 'login' : 'register');
+    setError('');
+    setPassword('');
+    setConfirmPassword('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -76,11 +89,20 @@ function AdminLogin() {
       setError('Enter both a username and password.');
       return;
     }
+    if (isRegister && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setLoading(true);
     try {
-      await login(username, password);
+      if (isRegister) {
+        await register({ username, password, displayName });
+        notify('Registrar account created. You are now signed in.', 'success');
+      } else {
+        await login(username, password);
+        notify('Signed in to the Credential Center.', 'success');
+      }
       setAdminAuthed(true);
-      notify('Signed in to the Credential Center.', 'success');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -98,13 +120,29 @@ function AdminLogin() {
           <p className="text-[11px] font-semibold tracking-[0.12em] text-teal uppercase mb-1">
             {REFERENCE_INSTITUTION.name}
           </p>
-          <h1 className="text-lg font-semibold mb-1">Credential Center</h1>
+          <h1 className="text-lg font-semibold mb-1">
+            {isRegister ? 'Create registrar account' : 'Credential Center'}
+          </h1>
           <p className="text-sm text-ink-soft mb-6">
-            Sign in with your registrar account to issue, manage and verify the integrity of
-            academic credentials.
+            {isRegister
+              ? 'Register a new registrar to issue and manage academic credentials. Your password is stored securely as a bcrypt hash.'
+              : 'Sign in with your registrar account to issue, manage and verify the integrity of academic credentials.'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
+            {isRegister && (
+              <div>
+                <label className="block text-xs font-medium text-ink-soft mb-1.5">
+                  Full name
+                </label>
+                <input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="Dr. A. Kumar"
+                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-ink-soft mb-1.5">
                 Registrar username
@@ -128,16 +166,43 @@ function AdminLogin() {
                 className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
               />
             </div>
+            {isRegister && (
+              <div>
+                <label className="block text-xs font-medium text-ink-soft mb-1.5">
+                  Confirm password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
+                />
+              </div>
+            )}
             {error && <p className="text-xs text-invalid">{error}</p>}
             <button
               type="submit"
               disabled={loading}
               className="w-full flex items-center justify-center gap-2 bg-teal text-white text-sm font-medium rounded-md py-2.5 hover:bg-teal/90 transition-colors disabled:opacity-60"
             >
-              {loading ? <Spinner size={15} /> : <Lock size={15} />}
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? <Spinner size={15} /> : isRegister ? <Plus size={15} /> : <Lock size={15} />}
+              {loading
+                ? isRegister
+                  ? 'Creating account…'
+                  : 'Signing in…'
+                : isRegister
+                ? 'Create account'
+                : 'Sign in'}
             </button>
           </form>
+
+          <p className="text-xs text-ink-soft text-center mt-5">
+            {isRegister ? 'Already have an account?' : 'New registrar?'}{' '}
+            <button type="button" onClick={switchMode} className="text-teal font-medium hover:underline">
+              {isRegister ? 'Sign in' : 'Create one'}
+            </button>
+          </p>
         </div>
       </div>
     </div>

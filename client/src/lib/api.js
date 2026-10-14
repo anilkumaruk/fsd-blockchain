@@ -90,6 +90,15 @@ export async function login(username, password) {
   return data.admin;
 }
 
+export async function register({ username, password, displayName }) {
+  const data = await request('/auth/register', {
+    method: 'POST',
+    body: { username, password, displayName },
+  });
+  setToken(data.token);
+  return data.admin;
+}
+
 export function logout() {
   setToken(null);
 }

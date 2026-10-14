@@ -47,6 +47,7 @@ To use **MongoDB Atlas**, set `MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>
 | Method | Endpoint                               | Auth  | Purpose                                     |
 | ------ | -------------------------------------- | ----- | ------------------------------------------- |
 | GET    | `/api/health`                          | –     | Server and database status                  |
+| POST   | `/api/auth/register`                   | –     | Create a registrar account (password is bcrypt-hashed) |
 | POST   | `/api/auth/login`                      | –     | Registrar login, returns a JWT              |
 | GET    | `/api/credentials?studentId=`          | –     | List all credentials, or one student's      |
 | GET    | `/api/credentials/:credentialId`       | –     | Get one credential                          |
