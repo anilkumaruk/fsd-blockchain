@@ -26,7 +26,7 @@ router.post('/register', async (req, res, next) => {
       return res.status(400).json({ message: 'Institution name, code, admin username and password are required.' });
     }
     if (!/^[A-Z0-9]{2,12}$/.test(instCode)) {
-      return res.status(400).json({ message: 'Institution code must be 2–12 letters or numbers (e.g. AU, RVCE).' });
+      return res.status(400).json({ message: 'Institution code must be 2–12 letters or numbers (e.g. AU).' });
     }
     if (!/^[a-z0-9._-]{3,30}$/.test(user)) {
       return res.status(400).json({ message: 'Username must be 3–30 letters, numbers, dots, dashes or underscores.' });

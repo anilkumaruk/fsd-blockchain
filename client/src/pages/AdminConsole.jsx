@@ -155,14 +155,14 @@ function AdminLogin() {
                   label="Institution name"
                   value={inst.name}
                   onChange={updateInst('name')}
-                  placeholder="RV College of Engineering"
+                  placeholder="Alliance University"
                 />
                 <div className="grid grid-cols-2 gap-3">
                   <Field
                     label="Institution code"
                     value={inst.code}
                     onChange={updateInst('code')}
-                    placeholder="RVCE"
+                    placeholder="AU"
                     maxLength={12}
                   />
                   <Field label="City" value={inst.city} onChange={updateInst('city')} placeholder="Bengaluru" />
@@ -172,7 +172,7 @@ function AdminLogin() {
                   type="email"
                   value={inst.email}
                   onChange={updateInst('email')}
-                  placeholder="registrar@college.edu.in"
+                  placeholder="registrar@alliance.edu.in"
                 />
                 <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide pt-2 border-t border-border">
                   Admin login
@@ -183,7 +183,7 @@ function AdminLogin() {
               label="Admin username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder={isRegister ? 'rvce.admin' : 'admin'}
+              placeholder={isRegister ? 'au.admin' : 'admin'}
             />
             <Field
               label="Password"
