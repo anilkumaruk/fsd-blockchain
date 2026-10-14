@@ -12,7 +12,10 @@ const credentialSchema = new mongoose.Schema(
   {
     credentialId: { type: String, required: true, unique: true, trim: true },
     studentName: { type: String, required: true, trim: true },
-    studentId: { type: String, required: true, trim: true, index: true },
+    studentId: { type: String, required: true, trim: true, index: true }, // the institution's roll number
+    // Links the credential to the student's one account across all institutions.
+    // Not part of the certificate / hash, so it is never printed on the PDF.
+    studentEmail: { type: String, trim: true, lowercase: true, default: '', index: true },
     credentialType: { type: String, required: true, trim: true },
     issueDate: { type: String, required: true }, // YYYY-MM-DD
     issuer: { type: String, required: true }, // institution name, printed on the certificate

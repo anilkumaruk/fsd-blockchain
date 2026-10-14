@@ -10,6 +10,8 @@ const router = Router();
 // Newest first — the Student Portal treats index 0 as the "current" record.
 const NEWEST_FIRST = { createdAt: -1, _id: -1 };
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const today = () => new Date().toISOString().slice(0, 10);
 const normalizeId = (id) => String(id || '').trim().toUpperCase();
 
@@ -60,9 +62,13 @@ router.post('/credentials', requireAdmin, async (req, res, next) => {
     const institution = await Institution.findById(req.institutionId);
     if (!institution) return res.status(401).json({ message: 'Session expired — please sign in again.' });
 
-    const { studentName, studentId, credentialType, issueDate, credentialId, txHash } = req.body || {};
+    const { studentName, studentId, studentEmail, credentialType, issueDate, credentialId, txHash } = req.body || {};
     if (!studentName?.trim() || !studentId?.trim() || !credentialType?.trim()) {
       return res.status(400).json({ message: 'Student name, student ID and credential type are required.' });
+    }
+    const email = studentEmail?.trim().toLowerCase();
+    if (!email || !EMAIL_PATTERN.test(email)) {
+      return res.status(400).json({ message: 'A valid student email is required.' });
     }
 
     // The admin review step generates the ID + tx ref up front so its preview hash
@@ -80,6 +86,7 @@ router.post('/credentials', requireAdmin, async (req, res, next) => {
     const hash = await hashCertificate(fields);
     const record = await Credential.create({
       ...fields,
+      studentEmail: email,
       hash,
       institution: institution._id,
       status: 'valid',

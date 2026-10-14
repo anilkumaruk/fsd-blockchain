@@ -5,13 +5,12 @@
 // backend (same shape in, same shape out).
 
 /**
- * @param {string} studentId
- * @param {Array} credentials - records for this student, as returned by
- *   getCredentialsForStudent (mock-store order: newly admin-issued
- *   credentials are unshifted to the front, so index 0 is the same
- *   "current" record the original Student Portal used for its heading).
+ * @param {{profileId: string, name: string}} account - the student's one
+ *   account across institutions (name comes from the account, not a credential).
+ * @param {Array} credentials - every credential issued to this student, from
+ *   any institution, newest first (index 0 is the "current" record).
  */
-export function buildStudentProfile(studentId, credentials) {
+export function buildStudentProfile(account, credentials) {
   const byIssueDateAsc = [...credentials].sort(
     (a, b) => new Date(a.issueDate) - new Date(b.issueDate)
   );
@@ -25,14 +24,18 @@ export function buildStudentProfile(studentId, credentials) {
   const representative = credentials[0] || null;
 
   const institutions = [...new Set(credentials.map((c) => c.issuer))];
+  // Each institution assigns its own roll number, so a student can have several.
+  const studentIds = [...new Set(credentials.map((c) => c.studentId))];
 
   const total = credentials.length;
   const active = credentials.filter((c) => c.status === 'valid').length;
   const revoked = credentials.filter((c) => c.status === 'revoked').length;
 
   return {
-    studentId,
-    studentName: representative?.studentName || null,
+    profileId: account.profileId,
+    studentIds,
+    studentId: studentIds.join(' · '),
+    studentName: account.name || representative?.studentName || null,
     // No separate "program" field exists on a credential — the
     // representative credential's type is used as the headline program,
     // the closest honest proxy available in the current data model.
@@ -69,8 +72,13 @@ export function groupCredentialsByYear(credentials) {
     ]);
 }
 
-export function buildProfileUrl(studentId) {
-  return `${window.location.origin}/profile/${encodeURIComponent(studentId)}`;
+export function buildProfileUrl(profileId) {
+  return `${window.location.origin}/profile/${encodeURIComponent(profileId)}`;
+}
+
+/** "Student ID" or "Student IDs" depending on how many institutions issued. */
+export function studentIdLabel(profile) {
+  return profile.studentIds.length > 1 ? 'Student IDs' : 'Student ID';
 }
 
 /** Two-letter avatar initials from a display name. */

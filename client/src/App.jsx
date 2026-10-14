@@ -20,7 +20,7 @@ export default function App() {
               <Route path="/admin" element={<AdminConsole />} />
               <Route path="/student" element={<StudentPortal />} />
               <Route path="/verify" element={<VerificationUI />} />
-              <Route path="/profile/:studentId" element={<PublicProfile />} />
+              <Route path="/profile/:profileId" element={<PublicProfile />} />
               <Route path="*" element={<Navigate to="/verify" replace />} />
             </Routes>
           </main>

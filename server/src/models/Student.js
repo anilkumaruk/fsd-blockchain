@@ -1,12 +1,21 @@
+import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-// A student login. Linked to credentials by studentId (case-insensitive).
+// One student login across every institution. The email is the unique login
+// and is what institutions enter when issuing, so credentials from any college
+// link to this one account. College roll numbers (studentId) stay on each credential.
 const studentSchema = new mongoose.Schema(
   {
-    studentId: { type: String, required: true, unique: true, trim: true, uppercase: true },
+    email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     name: { type: String, required: true, trim: true },
-    email: { type: String, trim: true, lowercase: true, default: '' },
+    // Public, unguessable id used in the shareable profile link (/profile/:profileId).
+    profileId: {
+      type: String,
+      required: true,
+      unique: true,
+      default: () => crypto.randomBytes(5).toString('hex'),
+    },
     passwordHash: { type: String, required: true },
   },
   {

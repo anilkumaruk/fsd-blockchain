@@ -106,18 +106,18 @@ export function logout() {
   setSession('institution', null);
 }
 
-/** Student login with Student ID + password. Returns the student. */
-export async function studentLogin(studentId, password) {
-  const data = await request('/student/login', { method: 'POST', body: { studentId, password } });
+/** Student login with email + password (one login across every institution). */
+export async function studentLogin(email, password) {
+  const data = await request('/student/login', { method: 'POST', body: { email, password } });
   setSession('student', data);
   return data.student;
 }
 
-/** One-time student sign-up; a Credential ID issued to them proves who they are. */
-export async function studentRegister({ studentId, credentialId, email, password }) {
+/** One-time student sign-up with name, email and password. */
+export async function studentRegister({ name, email, password }) {
   const data = await request('/student/register', {
     method: 'POST',
-    body: { studentId, credentialId, email, password },
+    body: { name, email, password },
   });
   setSession('student', data);
   return data.student;
@@ -127,7 +127,17 @@ export function studentLogout() {
   setSession('student', null);
 }
 
-/** Credentials belonging to the signed-in student. */
+/** Public Academic Passport: { profileId, name, credentials }, or null if not found. */
+export async function getPublicProfile(profileId) {
+  try {
+    return await request(`/student/profile/${encodeURIComponent(profileId)}`);
+  } catch (err) {
+    if (err.status === 404) return null;
+    throw err;
+  }
+}
+
+/** Credentials issued to the signed-in student, from every institution. */
 export function getMyCredentials() {
   return request('/student/me/credentials', { auth: 'student' });
 }
@@ -141,16 +151,20 @@ export function getInstitutions() {
  * the values it used to compute its preview hash; otherwise the server
  * generates fresh ones.
  */
-export function issueCredential({ studentName, studentId, credentialType, issueDate, credentialId, txHash }) {
+export function issueCredential({
+  studentName,
+  studentId,
+  studentEmail,
+  credentialType,
+  issueDate,
+  credentialId,
+  txHash,
+}) {
   return request('/credentials', {
     method: 'POST',
     auth: 'institution',
-    body: { studentName, studentId, credentialType, issueDate, credentialId, txHash },
+    body: { studentName, studentId, studentEmail, credentialType, issueDate, credentialId, txHash },
   });
-}
-
-export function getCredentialsForStudent(studentId) {
-  return request(`/credentials?studentId=${encodeURIComponent(studentId)}`);
 }
 
 export function getAllCredentials() {

@@ -37,6 +37,7 @@ import {
   groupCredentialsByYear,
   buildProfileUrl,
   getInitials,
+  studentIdLabel,
 } from '../lib/studentProfile';
 
 export default function StudentPortal() {
@@ -50,8 +51,7 @@ function StudentLogin() {
   const { studentSignIn } = useAuth();
   const { notify } = useToast();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [studentId, setStudentId] = useState('');
-  const [credentialId, setCredentialId] = useState('');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -70,12 +70,12 @@ function StudentLogin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!studentId.trim() || !password.trim()) {
-      setError('Enter both your Student ID and password.');
+    if (isRegister && !name.trim()) {
+      setError('Enter your full name.');
       return;
     }
-    if (isRegister && !credentialId.trim()) {
-      setError('Enter a Credential ID issued to you.');
+    if (!email.trim() || !password.trim()) {
+      setError('Enter both your email and password.');
       return;
     }
     if (isRegister && password !== confirmPassword) {
@@ -85,8 +85,8 @@ function StudentLogin() {
     setLoading(true);
     try {
       const signedIn = isRegister
-        ? await studentRegister({ studentId, credentialId, email, password })
-        : await studentLogin(studentId, password);
+        ? await studentRegister({ name, email, password })
+        : await studentLogin(email, password);
       notify(isRegister ? `Welcome, ${signedIn.name}! Your account is ready.` : `Welcome back, ${signedIn.name}.`, 'success');
       studentSignIn(signedIn);
     } catch (err) {
@@ -110,35 +110,27 @@ function StudentLogin() {
           </h1>
           <p className="text-sm text-ink-soft mb-6">
             {isRegister
-              ? 'Use any Credential ID your institution issued to you to prove it is you. You only do this once.'
-              : 'View, download and share the verified credentials issued to you.'}
+              ? 'One account for all your credentials — from every college or university you study at. Use the email you gave your institutions.'
+              : 'Sign in with your email to see the verified credentials issued to you by every institution.'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
-            <FormField
-              label="Student ID"
-              value={studentId}
-              onChange={(e) => setStudentId(e.target.value)}
-              placeholder="RGIT21CS014"
-            />
             {isRegister && (
-              <>
-                <FormField
-                  label="Credential ID"
-                  value={credentialId}
-                  onChange={(e) => setCredentialId(e.target.value)}
-                  placeholder="COR-2023-9F3A1C"
-                  hint="Printed on your certificate, or ask your institution."
-                />
-                <FormField
-                  label="Email (optional)"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@student.alliance.edu.in"
-                />
-              </>
+              <FormField
+                label="Full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ananya Sharma"
+              />
             )}
+            <FormField
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              hint={isRegister ? 'Your institutions issue credentials to this email.' : undefined}
+            />
             <FormField
               label="Password"
               type="password"
@@ -209,7 +201,7 @@ function StudentDashboard({ student }) {
     <div className="flex items-center justify-between gap-4">
       <p className="text-xs text-ink-soft">
         Signed in as <span className="font-medium text-ink">{student.name}</span>
-        <span className="font-mono"> · {student.studentId}</span>
+        <span> · {student.email}</span>
       </p>
       <button
         onClick={studentLogout}
@@ -233,14 +225,19 @@ function StudentDashboard({ student }) {
       <div className="max-w-4xl mx-auto px-4 sm:px-5 py-8 space-y-6">
         {signOutBar}
         <div className="bg-card border border-border rounded-lg p-8 text-center text-sm text-ink-soft">
-          No credentials issued yet.
+          <p className="font-medium text-ink mb-1">No credentials issued yet.</p>
+          <p>
+            When your college or university issues a credential to{' '}
+            <span className="font-medium text-ink">{student.email}</span>, it appears here
+            automatically.
+          </p>
         </div>
       </div>
     );
   }
 
-  const profile = buildStudentProfile(student.studentId, credentials);
-  const profileUrl = buildProfileUrl(student.studentId);
+  const profile = buildStudentProfile(student, credentials);
+  const profileUrl = buildProfileUrl(student.profileId);
   const yearGroups = groupCredentialsByYear(credentials);
 
   const handleDownloadResume = () => {
@@ -323,7 +320,7 @@ function ProfileHeader({ profile, onShare, onDownloadResume }) {
             )}
             <span className="flex items-center gap-1 font-mono">
               <BadgeCheck size={12} />
-              Student ID: {profile.studentId}
+              {studentIdLabel(profile)}: {profile.studentId}
             </span>
             {profile.latestIssueYear && (
               <span className="flex items-center gap-1">

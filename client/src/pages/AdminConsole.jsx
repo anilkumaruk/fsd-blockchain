@@ -460,9 +460,12 @@ function InstitutionPanel() {
 const EMPTY_FORM = {
   studentName: '',
   studentId: '',
+  studentEmail: '',
   credentialType: CREDENTIAL_TYPES[0],
   issueDate: new Date().toISOString().slice(0, 10),
 };
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const WIZARD_STEPS = [
   { key: 'student', label: 'Student Details' },
@@ -555,6 +558,7 @@ function IssuePanel({ credentials, onIssued, onViewCredential }) {
       const res = await issueCredential({
         studentName: form.studentName,
         studentId: form.studentId,
+        studentEmail: form.studentEmail,
         credentialType: form.credentialType,
         issueDate: form.issueDate,
         credentialId: candidate.credentialId,
@@ -647,7 +651,8 @@ function WizardSteps({ steps, activeIndex }) {
 
 function StepStudentDetails({ form, update, onContinue }) {
   const { institution } = useAuth();
-  const canContinue = form.studentName.trim() && form.studentId.trim();
+  const emailValid = EMAIL_PATTERN.test(form.studentEmail.trim());
+  const canContinue = form.studentName.trim() && form.studentId.trim() && emailValid;
   return (
     <div>
       <h2 className="text-lg font-semibold mb-1">Student details</h2>
@@ -671,6 +676,22 @@ function StepStudentDetails({ form, update, onContinue }) {
             placeholder="e.g. RGIT22CS051"
             className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
           />
+          <p className="text-[11px] text-ink-soft/80 mt-1">Your institution's roll number for this student.</p>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-ink-soft mb-1.5">Student email</label>
+          <input
+            type="email"
+            value={form.studentEmail}
+            onChange={update('studentEmail')}
+            placeholder="e.g. divya.menon@example.com"
+            className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
+          />
+          <p className={`text-[11px] mt-1 ${form.studentEmail.trim() && !emailValid ? 'text-invalid' : 'text-ink-soft/80'}`}>
+            {form.studentEmail.trim() && !emailValid
+              ? 'Enter a valid email address.'
+              : "The student's personal email. Credentials from every institution issued to this email appear in their one Student Portal account."}
+          </p>
         </div>
       </div>
 
@@ -806,6 +827,7 @@ function StepReview({
         <div className="p-4 space-y-3">
           <ReviewRow label="Student name" value={form.studentName} />
           <ReviewRow label="Student ID" value={form.studentId} mono />
+          <ReviewRow label="Student email" value={form.studentEmail} />
           <ReviewRow label="Credential" value={form.credentialType} />
           <ReviewRow label="Issue date" value={form.issueDate} />
         </div>
@@ -974,6 +996,7 @@ function RegistryPanel({ credentials, loading, onSelectCredential }) {
       return (
         c.studentName.toLowerCase().includes(q) ||
         c.studentId.toLowerCase().includes(q) ||
+        (c.studentEmail || '').includes(q) ||
         c.credentialId.toLowerCase().includes(q) ||
         c.credentialType.toLowerCase().includes(q)
       );
@@ -993,7 +1016,7 @@ function RegistryPanel({ credentials, loading, onSelectCredential }) {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, student ID, credential ID, or type…"
+            placeholder="Search name, student ID, email, credential ID, or type…"
             aria-label="Search credentials"
             className="w-full rounded-md border border-border bg-white pl-8 pr-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
           />
@@ -1145,6 +1168,7 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
         <div className="space-y-2.5 border border-border rounded-md p-4 bg-bg/50 mb-4">
           <ReviewRow label="Student" value={credential.studentName} />
           <ReviewRow label="Student ID" value={credential.studentId} mono />
+          {credential.studentEmail && <ReviewRow label="Student email" value={credential.studentEmail} />}
           <ReviewRow label="Institution" value={credential.issuer} />
           <ReviewRow label="Issue date" value={credential.issueDate} />
         </div>

@@ -23,7 +23,7 @@ import CredentialDNA from '../components/CredentialDNA';
 import AcademicJourney from '../components/AcademicJourney';
 import ShareProfileModal from '../components/ShareProfileModal';
 import { useToast } from '../context/ToastContext';
-import { getCredentialsForStudent } from '../lib/api';
+import { getPublicProfile } from '../lib/api';
 import { downloadVerifiedResumePdf } from '../lib/generateCertificatePdf';
 import {
   buildStudentProfile,
@@ -31,6 +31,7 @@ import {
   buildProfileUrl,
   getInitials,
   getProfileVerificationState,
+  studentIdLabel,
 } from '../lib/studentProfile';
 
 const STATE_META = {
@@ -79,7 +80,7 @@ const TRUST_STEPS = [
  * ledger/tx references, no dashboard-style editing affordances.
  */
 export default function PublicProfile() {
-  const { studentId } = useParams();
+  const { profileId } = useParams();
   const { notify } = useToast();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -90,13 +91,13 @@ export default function PublicProfile() {
     let cancelled = false;
     setLoading(true);
     setNotFound(false);
-    getCredentialsForStudent(studentId)
+    getPublicProfile(profileId)
       .then((data) => {
         if (cancelled) return;
-        if (data.length === 0) {
+        if (!data || data.credentials.length === 0) {
           setNotFound(true);
         } else {
-          setProfile(buildStudentProfile(studentId, data));
+          setProfile(buildStudentProfile(data, data.credentials));
         }
       })
       .catch((err) => !cancelled && notify(err.message, 'error'))
@@ -104,7 +105,7 @@ export default function PublicProfile() {
     return () => {
       cancelled = true;
     };
-  }, [studentId, notify]);
+  }, [profileId, notify]);
 
   if (loading) {
     return (
@@ -122,14 +123,14 @@ export default function PublicProfile() {
         </div>
         <h1 className="text-lg font-semibold mb-1">Profile not found</h1>
         <p className="text-sm text-ink-soft">
-          No academic passport exists for student ID{' '}
-          <span className="font-mono">{studentId}</span>.
+          No academic passport exists at this link. Ask the student to share their link
+          again.
         </p>
       </div>
     );
   }
 
-  const profileUrl = buildProfileUrl(studentId);
+  const profileUrl = buildProfileUrl(profileId);
   const state = getProfileVerificationState(profile.stats);
   const meta = STATE_META[state];
   const StateIcon = meta.Icon;
@@ -203,7 +204,9 @@ export default function PublicProfile() {
         )}
 
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 mt-2.5 text-xs text-ink-soft">
-          <span className="font-mono">Student ID: {profile.studentId}</span>
+          <span className="font-mono">
+            {studentIdLabel(profile)}: {profile.studentId}
+          </span>
           {profile.latestIssueYear && <span>Class of {profile.latestIssueYear}</span>}
         </div>
 

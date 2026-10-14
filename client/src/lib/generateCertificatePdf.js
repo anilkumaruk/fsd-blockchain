@@ -128,7 +128,12 @@ export function buildResumeBytes(profile, credentials, profileUrl) {
     { text: profile.studentName || 'Unknown student', size: 15, gap: 22 },
     { text: profile.primaryProgram || '', size: 11, gap: 18 },
     { text: profile.primaryInstitution || '', size: 10, gap: 18, color: [0.34, 0.41, 0.44] },
-    { text: `Student ID: ${profile.studentId}`, size: 9, gap: 14, color: [0.34, 0.41, 0.44] },
+    {
+      text: `${profile.studentIds.length > 1 ? 'Student IDs' : 'Student ID'}: ${profile.studentId}`,
+      size: 9,
+      gap: 14,
+      color: [0.34, 0.41, 0.44],
+    },
   ];
 
   if (profile.latestIssueYear) {
@@ -241,7 +246,7 @@ export function downloadVerifiedResumePdf(profile, credentials, profileUrl) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${profile.studentId}-verified-resume.pdf`;
+  a.download = `${profile.profileId}-verified-resume.pdf`;
   document.body.appendChild(a);
   a.click();
   a.remove();

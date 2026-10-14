@@ -27,11 +27,14 @@ export function requireAdmin(req, res, next) {
   next();
 }
 
-// Student routes. Sets req.studentId (the student's academic ID, e.g. RGIT21CS014).
+// Student routes. Sets req.studentEmail (the student's one login across institutions).
 export function requireStudent(req, res, next) {
   const payload = readToken(req, res);
   if (!payload) return;
   if (payload.role !== 'student') return res.status(403).json({ message: 'Student access only.' });
-  req.studentId = payload.studentId;
+  // Tokens from before email logins carry no email; make them sign in again
+  // (an undefined filter would otherwise match every credential).
+  if (!payload.email) return res.status(401).json({ message: 'Session expired — please sign in again.' });
+  req.studentEmail = payload.email;
   next();
 }

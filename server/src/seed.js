@@ -19,6 +19,7 @@ const seedCredentials = [
     credentialId: 'COR-2023-9F3A1C',
     studentName: 'Ananya Sharma',
     studentId: 'RGIT21CS014',
+    studentEmail: 'ananya.sharma@example.com',
     credentialType: 'B.Tech in Computer Science & Engineering',
     issueDate: '2023-06-15',
     status: 'valid',
@@ -30,6 +31,7 @@ const seedCredentials = [
     credentialId: 'COR-2023-4B7E22',
     studentName: 'Rohan Verma',
     studentId: 'RGIT21CS027',
+    studentEmail: 'rohan.verma@example.com',
     credentialType: 'B.Tech in Computer Science & Engineering',
     issueDate: '2023-06-15',
     status: 'revoked',
@@ -44,6 +46,7 @@ const seedCredentials = [
     credentialId: 'COR-2022-1A88D0',
     studentName: 'Priya Nair',
     studentId: 'RGIT19CS002',
+    studentEmail: 'priya.nair@example.com',
     credentialType: 'B.Tech in Electronics & Communication Engineering',
     issueDate: '2022-05-30',
     status: 'valid',
@@ -55,6 +58,7 @@ const seedCredentials = [
     credentialId: 'COR-2023-77C3E9',
     studentName: 'Karthik Iyer',
     studentId: 'RGIT21CS014',
+    studentEmail: 'karthik.iyer@example.com',
     credentialType: 'M.Tech in Data Science',
     issueDate: '2023-11-20',
     status: 'valid',
@@ -66,6 +70,7 @@ const seedCredentials = [
     credentialId: 'COR-2021-C51F6A',
     studentName: 'Sneha Reddy',
     studentId: 'RGIT18CS041',
+    studentEmail: 'sneha.reddy@example.com',
     credentialType: 'B.Tech in Computer Science & Engineering',
     issueDate: '2021-06-10',
     status: 'valid',
@@ -77,6 +82,7 @@ const seedCredentials = [
     credentialId: 'COR-2022-E20B4D',
     studentName: 'Aditya Kulkarni',
     studentId: 'RGIT19CS009',
+    studentEmail: 'aditya.kulkarni@example.com',
     credentialType: 'B.Tech in Information Technology',
     issueDate: '2022-06-18',
     status: 'revoked',
@@ -91,6 +97,7 @@ const seedCredentials = [
     credentialId: 'COR-2020-88A5F1',
     studentName: 'Meera Joshi',
     studentId: 'RGIT17CS003',
+    studentEmail: 'meera.joshi@example.com',
     credentialType: 'B.Tech in Computer Science & Engineering',
     issueDate: '2020-06-22',
     status: 'valid',
@@ -102,6 +109,7 @@ const seedCredentials = [
     credentialId: 'COR-2024-3D6C90',
     studentName: 'Vikram Singh',
     studentId: 'RGIT20CS033',
+    studentEmail: 'vikram.singh@example.com',
     credentialType: 'B.Tech in Computer Science & Engineering',
     issueDate: '2024-06-05',
     status: 'valid',
@@ -133,6 +141,7 @@ async function seed() {
   const docs = [];
   for (const [i, c] of seedCredentials.entries()) {
     // Stagger createdAt so list order matches the prototype (first seed = newest).
+    // studentEmail is not part of the certificate, so it is left out of the hash input.
     docs.push({
       ...c,
       institution: alliance._id,
@@ -145,11 +154,11 @@ async function seed() {
 
   // Demo student login (Student Portal)
   const demo = await Student.create({
-    studentId: 'RGIT21CS014',
+    email: 'ananya.sharma@example.com',
     name: 'Ananya Sharma',
     passwordHash: await Student.hashPassword(process.env.STUDENT_PASSWORD || 'student123'),
   });
-  console.log(`Student ready: ${demo.name} (login: ${demo.studentId})`);
+  console.log(`Student ready: ${demo.name} (login: ${demo.email})`);
 
   await mongoose.disconnect();
 }
