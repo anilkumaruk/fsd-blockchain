@@ -35,6 +35,7 @@ import StatusBadge from '../components/StatusBadge';
 import Spinner from '../components/Spinner';
 import CredentialDNA, { shortenHash } from '../components/CredentialDNA';
 import VerificationProofModal from '../components/VerificationProofModal';
+import FormField from '../components/FormField';
 import {
   issueCredential,
   getInstitutionCredentials,
@@ -61,20 +62,7 @@ export default function AdminConsole() {
 
 // ---- Login / institution registration ----------------------------------------
 
-const INPUT_CLASS =
-  'w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal';
-
 const EMPTY_INSTITUTION = { name: '', code: '', city: '', email: '' };
-
-function Field({ label, hint, ...props }) {
-  return (
-    <div>
-      <label className="block text-xs font-medium text-ink-soft mb-1.5">{label}</label>
-      <input className={INPUT_CLASS} {...props} />
-      {hint && <p className="text-[11px] text-ink-soft/80 mt-1">{hint}</p>}
-    </div>
-  );
-}
 
 function AdminLogin() {
   const { signIn } = useAuth();
@@ -151,23 +139,23 @@ function AdminLogin() {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {isRegister && (
               <>
-                <Field
+                <FormField
                   label="Institution name"
                   value={inst.name}
                   onChange={updateInst('name')}
                   placeholder="Alliance University"
                 />
                 <div className="grid grid-cols-2 gap-3">
-                  <Field
+                  <FormField
                     label="Institution code"
                     value={inst.code}
                     onChange={updateInst('code')}
                     placeholder="AU"
                     maxLength={12}
                   />
-                  <Field label="City" value={inst.city} onChange={updateInst('city')} placeholder="Bengaluru" />
+                  <FormField label="City" value={inst.city} onChange={updateInst('city')} placeholder="Bengaluru" />
                 </div>
-                <Field
+                <FormField
                   label="Official email"
                   type="email"
                   value={inst.email}
@@ -179,13 +167,13 @@ function AdminLogin() {
                 </p>
               </>
             )}
-            <Field
+            <FormField
               label="Admin username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder={isRegister ? 'au.admin' : 'admin'}
             />
-            <Field
+            <FormField
               label="Password"
               type="password"
               value={password}
@@ -194,7 +182,7 @@ function AdminLogin() {
               hint={isRegister ? 'At least 6 characters. Stored securely as a bcrypt hash.' : undefined}
             />
             {isRegister && (
-              <Field
+              <FormField
                 label="Confirm password"
                 type="password"
                 value={confirmPassword}

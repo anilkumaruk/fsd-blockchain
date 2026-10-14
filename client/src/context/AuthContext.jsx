@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from 'react';
-import { getSession, logout as clearSession } from '../lib/api';
+import { getSession, logout as clearSession, studentLogout as clearStudentSession } from '../lib/api';
 
 const AuthContext = createContext(null);
 
@@ -8,14 +8,30 @@ export function AuthProvider({ children }) {
   // sessionStorage so a page refresh keeps you signed in.
   const [institution, setInstitution] = useState(() => getSession()?.institution || null);
 
+  // The signed-in student (Student Portal), kept separately from the institution.
+  const [student, setStudent] = useState(() => getSession('student')?.student || null);
+
   const logout = () => {
     clearSession();
     setInstitution(null);
   };
 
+  const studentLogout = () => {
+    clearStudentSession();
+    setStudent(null);
+  };
+
   return (
     <AuthContext.Provider
-      value={{ adminAuthed: Boolean(institution), institution, signIn: setInstitution, logout }}
+      value={{
+        adminAuthed: Boolean(institution),
+        institution,
+        signIn: setInstitution,
+        logout,
+        student,
+        studentSignIn: setStudent,
+        studentLogout,
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -15,8 +15,13 @@ import {
   ChevronDown,
   Hash,
   Eye,
+  GraduationCap,
+  Lock,
+  Plus,
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import FormField from '../components/FormField';
 import StatusBadge from '../components/StatusBadge';
 import HashChip from '../components/HashChip';
 import Spinner from '../components/Spinner';
@@ -25,7 +30,7 @@ import CredentialDNA from '../components/CredentialDNA';
 import VerificationProofModal from '../components/VerificationProofModal';
 import CredentialGraph from '../components/CredentialGraph';
 import AcademicJourney from '../components/AcademicJourney';
-import { getCredentialsForStudent, DEMO_STUDENT_ID } from '../lib/api';
+import { getMyCredentials, studentLogin, studentRegister } from '../lib/api';
 import { downloadCertificatePdf, downloadVerifiedResumePdf } from '../lib/generateCertificatePdf';
 import {
   buildStudentProfile,
@@ -35,17 +40,185 @@ import {
 } from '../lib/studentProfile';
 
 export default function StudentPortal() {
+  const { student } = useAuth();
+  return student ? <StudentDashboard student={student} /> : <StudentLogin />;
+}
+
+// ---- Student sign-in / sign-up ----------------------------------------------
+
+function StudentLogin() {
+  const { studentSignIn } = useAuth();
+  const { notify } = useToast();
+  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [studentId, setStudentId] = useState('');
+  const [credentialId, setCredentialId] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const isRegister = mode === 'register';
+
+  const switchMode = () => {
+    setMode(isRegister ? 'login' : 'register');
+    setError('');
+    setPassword('');
+    setConfirmPassword('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    if (!studentId.trim() || !password.trim()) {
+      setError('Enter both your Student ID and password.');
+      return;
+    }
+    if (isRegister && !credentialId.trim()) {
+      setError('Enter a Credential ID issued to you.');
+      return;
+    }
+    if (isRegister && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const signedIn = isRegister
+        ? await studentRegister({ studentId, credentialId, email, password })
+        : await studentLogin(studentId, password);
+      notify(isRegister ? `Welcome, ${signedIn.name}! Your account is ready.` : `Welcome back, ${signedIn.name}.`, 'success');
+      studentSignIn(signedIn);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-sm">
+        <div className="bg-card border border-border rounded-lg card-shadow p-7">
+          <div className="w-11 h-11 rounded-lg bg-teal-soft flex items-center justify-center mb-4">
+            <GraduationCap size={22} className="text-teal" />
+          </div>
+          <p className="text-[11px] font-semibold tracking-[0.12em] text-teal uppercase mb-1">
+            Student Portal
+          </p>
+          <h1 className="text-lg font-semibold mb-1">
+            {isRegister ? 'Create your student account' : 'Sign in to your Academic Passport'}
+          </h1>
+          <p className="text-sm text-ink-soft mb-6">
+            {isRegister
+              ? 'Use any Credential ID your institution issued to you to prove it is you. You only do this once.'
+              : 'View, download and share the verified credentials issued to you.'}
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            <FormField
+              label="Student ID"
+              value={studentId}
+              onChange={(e) => setStudentId(e.target.value)}
+              placeholder="RGIT21CS014"
+            />
+            {isRegister && (
+              <>
+                <FormField
+                  label="Credential ID"
+                  value={credentialId}
+                  onChange={(e) => setCredentialId(e.target.value)}
+                  placeholder="COR-2023-9F3A1C"
+                  hint="Printed on your certificate, or ask your institution."
+                />
+                <FormField
+                  label="Email (optional)"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@student.alliance.edu.in"
+                />
+              </>
+            )}
+            <FormField
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              hint={isRegister ? 'At least 6 characters. Stored securely as a bcrypt hash.' : undefined}
+            />
+            {isRegister && (
+              <FormField
+                label="Confirm password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            )}
+            {error && <p className="text-xs text-invalid">{error}</p>}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-teal text-white text-sm font-medium rounded-md py-2.5 hover:bg-teal/90 transition-colors disabled:opacity-60"
+            >
+              {loading ? <Spinner size={15} /> : isRegister ? <Plus size={15} /> : <Lock size={15} />}
+              {loading
+                ? isRegister
+                  ? 'Creating account…'
+                  : 'Signing in…'
+                : isRegister
+                ? 'Create account'
+                : 'Sign in'}
+            </button>
+          </form>
+
+          <p className="text-xs text-ink-soft text-center mt-5">
+            {isRegister ? 'Already have an account?' : 'First time here?'}{' '}
+            <button type="button" onClick={switchMode} className="text-teal font-medium hover:underline">
+              {isRegister ? 'Sign in' : 'Create your account'}
+            </button>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- Dashboard ----------------------------------------------------------------
+
+function StudentDashboard({ student }) {
+  const { studentLogout } = useAuth();
   const { notify } = useToast();
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
-    getCredentialsForStudent(DEMO_STUDENT_ID)
+    getMyCredentials()
       .then(setCredentials)
-      .catch((err) => notify(err.message, 'error'))
+      .catch((err) => {
+        notify(err.message, 'error');
+        if (err.status === 401) studentLogout();
+      })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notify]);
+
+  const signOutBar = (
+    <div className="flex items-center justify-between gap-4">
+      <p className="text-xs text-ink-soft">
+        Signed in as <span className="font-medium text-ink">{student.name}</span>
+        <span className="font-mono"> · {student.studentId}</span>
+      </p>
+      <button
+        onClick={studentLogout}
+        className="text-sm text-ink-soft hover:text-ink border border-border rounded-md px-3 py-1.5 shrink-0"
+      >
+        Sign out
+      </button>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -57,7 +230,8 @@ export default function StudentPortal() {
 
   if (credentials.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto px-4 sm:px-5 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-5 py-8 space-y-6">
+        {signOutBar}
         <div className="bg-card border border-border rounded-lg p-8 text-center text-sm text-ink-soft">
           No credentials issued yet.
         </div>
@@ -65,8 +239,8 @@ export default function StudentPortal() {
     );
   }
 
-  const profile = buildStudentProfile(DEMO_STUDENT_ID, credentials);
-  const profileUrl = buildProfileUrl(DEMO_STUDENT_ID);
+  const profile = buildStudentProfile(student.studentId, credentials);
+  const profileUrl = buildProfileUrl(student.studentId);
   const yearGroups = groupCredentialsByYear(credentials);
 
   const handleDownloadResume = () => {
@@ -76,6 +250,8 @@ export default function StudentPortal() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-5 py-8 space-y-6">
+      {signOutBar}
+
       <ProfileHeader
         profile={profile}
         onShare={() => setShareOpen(true)}

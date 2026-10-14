@@ -7,6 +7,7 @@ import mongoose from 'mongoose';
 import { connectDB } from './db.js';
 import Credential from './models/Credential.js';
 import Institution from './models/Institution.js';
+import Student from './models/Student.js';
 import { hashCertificate } from './certificate.js';
 
 const ISSUER_NAME = 'Alliance University';
@@ -115,6 +116,7 @@ async function seed() {
 
   await Credential.deleteMany({});
   await Institution.deleteMany({});
+  await Student.deleteMany({});
   await mongoose.connection.db.dropCollection('admins').catch(() => {}); // old single-admin collection
 
   const alliance = await Institution.create({
@@ -140,6 +142,14 @@ async function seed() {
   }
   await Credential.insertMany(docs);
   console.log(`Inserted ${docs.length} credentials`);
+
+  // Demo student login (Student Portal)
+  const demo = await Student.create({
+    studentId: 'RGIT21CS014',
+    name: 'Ananya Sharma',
+    passwordHash: await Student.hashPassword(process.env.STUDENT_PASSWORD || 'student123'),
+  });
+  console.log(`Student ready: ${demo.name} (login: ${demo.studentId})`);
 
   await mongoose.disconnect();
 }

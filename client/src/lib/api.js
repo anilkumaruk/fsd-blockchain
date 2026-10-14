@@ -7,7 +7,9 @@
 // Verification screen produces a real SHA-256 match against MongoDB.
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-const SESSION_KEY = 'cor-institution-session';
+// Institution-admin and student sessions are stored separately, so both
+// portals can be signed in at once (e.g. during a demo).
+const SESSION_KEYS = { institution: 'cor-institution-session', student: 'cor-student-session' };
 
 const HEX = '0123456789abcdef';
 
@@ -30,28 +32,21 @@ export function fakeCredentialId() {
   return `COR-${year}-${randomHex(6).toUpperCase()}`;
 }
 
-// The "logged in" demo student — used by the Student Portal.
-export const DEMO_STUDENT_ID = 'RGIT21CS014';
+// ---- sessions (JWT + signed-in institution or student) -------------------
 
-// ---- session (JWT + logged-in institution) ------------------------------
-
-export function getSession() {
+export function getSession(role = 'institution') {
   try {
-    const raw = window.sessionStorage.getItem(SESSION_KEY);
+    const raw = window.sessionStorage.getItem(SESSION_KEYS[role]);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-function getToken() {
-  return getSession()?.token || null;
-}
-
-function setSession(session) {
+function setSession(role, session) {
   try {
-    if (session) window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-    else window.sessionStorage.removeItem(SESSION_KEY);
+    if (session) window.sessionStorage.setItem(SESSION_KEYS[role], JSON.stringify(session));
+    else window.sessionStorage.removeItem(SESSION_KEYS[role]);
   } catch {
     // storage unavailable — login just won't survive a refresh
   }
@@ -59,10 +54,11 @@ function setSession(session) {
 
 // ---- fetch helper --------------------------------------------------------
 
+// `auth` is the session to send: 'institution', 'student', or false for public calls.
 async function request(path, { method = 'GET', body, auth = false } = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (auth) {
-    const token = getToken();
+    const token = getSession(auth)?.token;
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
@@ -79,7 +75,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    if (res.status === 401 && auth) setSession(null);
+    if (res.status === 401 && auth) setSession(auth, null);
     const err = new Error(data?.message || `Request failed (${res.status})`);
     err.status = res.status;
     throw err;
@@ -92,7 +88,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
 /** Institution admin login. Returns the institution. */
 export async function login(username, password) {
   const data = await request('/auth/login', { method: 'POST', body: { username, password } });
-  setSession(data);
+  setSession('institution', data);
   return data.institution;
 }
 
@@ -102,12 +98,38 @@ export async function registerInstitution({ name, code, city, email, username, p
     method: 'POST',
     body: { name, code, city, email, username, password },
   });
-  setSession(data);
+  setSession('institution', data);
   return data.institution;
 }
 
 export function logout() {
-  setSession(null);
+  setSession('institution', null);
+}
+
+/** Student login with Student ID + password. Returns the student. */
+export async function studentLogin(studentId, password) {
+  const data = await request('/student/login', { method: 'POST', body: { studentId, password } });
+  setSession('student', data);
+  return data.student;
+}
+
+/** One-time student sign-up; a Credential ID issued to them proves who they are. */
+export async function studentRegister({ studentId, credentialId, email, password }) {
+  const data = await request('/student/register', {
+    method: 'POST',
+    body: { studentId, credentialId, email, password },
+  });
+  setSession('student', data);
+  return data.student;
+}
+
+export function studentLogout() {
+  setSession('student', null);
+}
+
+/** Credentials belonging to the signed-in student. */
+export function getMyCredentials() {
+  return request('/student/me/credentials', { auth: 'student' });
 }
 
 export function getInstitutions() {
@@ -122,7 +144,7 @@ export function getInstitutions() {
 export function issueCredential({ studentName, studentId, credentialType, issueDate, credentialId, txHash }) {
   return request('/credentials', {
     method: 'POST',
-    auth: true,
+    auth: 'institution',
     body: { studentName, studentId, credentialType, issueDate, credentialId, txHash },
   });
 }
@@ -137,13 +159,13 @@ export function getAllCredentials() {
 
 /** Credentials issued by the logged-in institution only. */
 export function getInstitutionCredentials() {
-  return request('/my/credentials', { auth: true });
+  return request('/my/credentials', { auth: 'institution' });
 }
 
 export function revokeCredential(credentialId, reason) {
   return request(`/credentials/${encodeURIComponent(credentialId)}/revoke`, {
     method: 'PATCH',
-    auth: true,
+    auth: 'institution',
     body: { reason },
   });
 }

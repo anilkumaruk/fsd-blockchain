@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { connectDB } from './db.js';
 import authRoutes from './routes/auth.js';
 import credentialRoutes from './routes/credentials.js';
+import studentRoutes from './routes/student.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -16,6 +17,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRoutes);
+app.use('/api/student', studentRoutes);
 app.use('/api', credentialRoutes);
 
 app.use('/api', (_req, res) => res.status(404).json({ message: 'Not found' }));

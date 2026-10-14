@@ -6,7 +6,7 @@ const router = Router();
 
 function sessionFor(institution) {
   const token = jwt.sign(
-    { sub: institution._id.toString(), username: institution.username },
+    { sub: institution._id.toString(), role: 'institution', username: institution.username },
     process.env.JWT_SECRET,
     { expiresIn: '8h' }
   );

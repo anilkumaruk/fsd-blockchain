@@ -4,12 +4,14 @@ Verifiable academic credential system. The UI is the same as the design prototyp
 
 Any college or university can **register as an institution**. Each institution has one admin account. Its admin issues and revokes only that institution's credentials. Anyone can verify a credential from any institution. Alliance University is created by the seed script as the first registered institution.
 
+**Students** sign in to the Student Portal with their Student ID and a password. The first time, they create an account by entering a Credential ID that was issued to them. This proves they are that student.
+
 | Layer    | Tech                                              |
 | -------- | ------------------------------------------------- |
 | Frontend | React 19, Vite, Tailwind CSS, React Router        |
 | Backend  | Node.js, Express                                  |
 | Database | MongoDB with Mongoose                             |
-| Auth     | JWT, with institution admin passwords hashed using bcrypt |
+| Auth     | JWT with roles (institution, student); passwords hashed using bcrypt |
 
 ## Folder structure
 
@@ -24,9 +26,9 @@ blockchain-fsd/
         ├── db.js           MongoDB connection
         ├── seed.js         Creates Alliance University and its demo credentials
         ├── certificate.js  SHA-256 of the certificate PDF
-        ├── models/         Institution, Credential (Mongoose schemas)
-        ├── routes/         auth.js, credentials.js
-        └── middleware/     auth.js (checks the JWT)
+        ├── models/         Institution, Student, Credential (Mongoose schemas)
+        ├── routes/         auth.js, student.js, credentials.js
+        └── middleware/     auth.js (checks the JWT and role)
 ```
 
 ## Run it
@@ -36,11 +38,15 @@ You need Node 20+ and a running MongoDB. A local install works: `brew services s
 ```bash
 npm run install:all     # install root, server and client packages
 cp server/.env.example server/.env   # skip if .env already exists
-npm run seed            # create Alliance University and 8 demo credentials
+npm run seed            # create Alliance University, 8 demo credentials, 1 demo student
 npm run dev             # API on :4000, web app on :5173
 ```
 
 Open http://localhost:5173/admin. Alliance University login: **admin / admin123**. You can change it in `server/.env`, then run `npm run seed` again. To add another college, click **Register your institution** on the sign-in card.
+
+Student Portal at http://localhost:5173/student. Demo student login: **RGIT21CS014 / student123**.
+
+> `npm run seed` deletes every registered institution, student and credential, then recreates only the demo data.
 
 To use **MongoDB Atlas**, set `MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>/chain_of_record` in `server/.env`.
 
@@ -53,6 +59,9 @@ To use **MongoDB Atlas**, set `MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>
 | POST   | `/api/auth/login`                      | –     | Institution admin login, returns a JWT      |
 | GET    | `/api/auth/institutions`               | –     | List registered institutions                |
 | GET    | `/api/my/credentials`                  | Admin | Credentials issued by your institution      |
+| POST   | `/api/student/register`                | –     | Student sign-up (Student ID + a Credential ID issued to them) |
+| POST   | `/api/student/login`                   | –     | Student login, returns a JWT                |
+| GET    | `/api/student/me/credentials`          | Student | The signed-in student's credentials       |
 | GET    | `/api/credentials?studentId=`          | –     | List all credentials, or one student's      |
 | GET    | `/api/credentials/:credentialId`       | –     | Get one credential                          |
 | POST   | `/api/credentials`                     | Admin | Issue a credential as your institution (server computes the hash) |
