@@ -1,12 +1,15 @@
-// Seeds MongoDB with the same demo credentials the design prototype shipped with,
-// plus a registrar login. Safe to re-run: it resets the credentials collection.
+// Seeds MongoDB with Alliance University as the first registered institution
+// (with its admin login) and the demo credentials the design prototype shipped
+// with. Safe to re-run: it resets institutions and credentials.
 //   npm run seed
 import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 import { connectDB } from './db.js';
 import Credential from './models/Credential.js';
-import Admin from './models/Admin.js';
-import { hashCertificate, ISSUER_NAME } from './certificate.js';
+import Institution from './models/Institution.js';
+import { hashCertificate } from './certificate.js';
+
+const ISSUER_NAME = 'Alliance University';
 
 const txHash = () => '0x' + crypto.randomBytes(32).toString('hex');
 
@@ -111,23 +114,32 @@ async function seed() {
   await connectDB();
 
   await Credential.deleteMany({});
+  await Institution.deleteMany({});
+  await mongoose.connection.db.dropCollection('admins').catch(() => {}); // old single-admin collection
+
+  const alliance = await Institution.create({
+    name: ISSUER_NAME,
+    code: 'AU',
+    city: 'Bengaluru',
+    email: 'registrar@alliance.edu.in',
+    username: (process.env.ADMIN_USERNAME || 'admin').toLowerCase(),
+    passwordHash: await Institution.hashPassword(process.env.ADMIN_PASSWORD || 'admin123'),
+  });
+  console.log(`Institution ready: ${alliance.name} (login: ${alliance.username})`);
+
   const now = Date.now();
   const docs = [];
   for (const [i, c] of seedCredentials.entries()) {
     // Stagger createdAt so list order matches the prototype (first seed = newest).
-    docs.push({ ...c, hash: await hashCertificate(c), createdAt: new Date(now - i * 1000) });
+    docs.push({
+      ...c,
+      institution: alliance._id,
+      hash: await hashCertificate(c),
+      createdAt: new Date(now - i * 1000),
+    });
   }
   await Credential.insertMany(docs);
   console.log(`Inserted ${docs.length} credentials`);
-
-  const username = (process.env.ADMIN_USERNAME || 'admin').toLowerCase();
-  const passwordHash = await Admin.hashPassword(process.env.ADMIN_PASSWORD || 'admin123');
-  await Admin.findOneAndUpdate(
-    { username },
-    { username, passwordHash, displayName: 'Registrar' },
-    { upsert: true }
-  );
-  console.log(`Admin account ready: ${username}`);
 
   await mongoose.disconnect();
 }

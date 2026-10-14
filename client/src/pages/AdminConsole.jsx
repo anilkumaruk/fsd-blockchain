@@ -37,15 +37,14 @@ import CredentialDNA, { shortenHash } from '../components/CredentialDNA';
 import VerificationProofModal from '../components/VerificationProofModal';
 import {
   issueCredential,
-  getAllCredentials,
+  getInstitutionCredentials,
   revokeCredential,
   fakeCredentialId,
   fakeTxHash,
   login,
-  register,
+  registerInstitution,
 } from '../lib/api';
 import { buildCertificateBytes, computeSha256Hex, downloadCertificatePdf } from '../lib/generateCertificatePdf';
-import { REFERENCE_INSTITUTION } from '../lib/institution';
 
 const CREDENTIAL_TYPES = [
   'B.Tech in Computer Science & Engineering',
@@ -60,13 +59,28 @@ export default function AdminConsole() {
   return adminAuthed ? <AdminDashboard /> : <AdminLogin />;
 }
 
-// ---- Login -----------------------------------------------------------------
+// ---- Login / institution registration ----------------------------------------
+
+const INPUT_CLASS =
+  'w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal';
+
+const EMPTY_INSTITUTION = { name: '', code: '', city: '', email: '' };
+
+function Field({ label, hint, ...props }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-ink-soft mb-1.5">{label}</label>
+      <input className={INPUT_CLASS} {...props} />
+      {hint && <p className="text-[11px] text-ink-soft/80 mt-1">{hint}</p>}
+    </div>
+  );
+}
 
 function AdminLogin() {
-  const { setAdminAuthed } = useAuth();
+  const { signIn } = useAuth();
   const { notify } = useToast();
   const [mode, setMode] = useState('login'); // 'login' | 'register'
-  const [displayName, setDisplayName] = useState('');
+  const [inst, setInst] = useState(EMPTY_INSTITUTION);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -74,6 +88,7 @@ function AdminLogin() {
   const [error, setError] = useState('');
 
   const isRegister = mode === 'register';
+  const updateInst = (key) => (e) => setInst((prev) => ({ ...prev, [key]: e.target.value }));
 
   const switchMode = () => {
     setMode(isRegister ? 'login' : 'register');
@@ -85,6 +100,10 @@ function AdminLogin() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (isRegister && (!inst.name.trim() || !inst.code.trim())) {
+      setError('Enter the institution name and code.');
+      return;
+    }
     if (!username.trim() || !password.trim()) {
       setError('Enter both a username and password.');
       return;
@@ -96,89 +115,92 @@ function AdminLogin() {
     setLoading(true);
     try {
       if (isRegister) {
-        await register({ username, password, displayName });
-        notify('Registrar account created. You are now signed in.', 'success');
+        const institution = await registerInstitution({ ...inst, username, password });
+        notify(`${institution.name} is now registered.`, 'success');
+        signIn(institution);
       } else {
-        await login(username, password);
-        notify('Signed in to the Credential Center.', 'success');
+        const institution = await login(username, password);
+        notify(`Signed in to ${institution.name}.`, 'success');
+        signIn(institution);
       }
-      setAdminAuthed(true);
     } catch (err) {
       setError(err.message);
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-sm">
+      <div className={`w-full ${isRegister ? 'max-w-md' : 'max-w-sm'}`}>
         <div className="bg-card border border-border rounded-lg card-shadow p-7">
           <div className="w-11 h-11 rounded-lg bg-teal-soft flex items-center justify-center mb-4">
             <Landmark size={22} className="text-teal" />
           </div>
           <p className="text-[11px] font-semibold tracking-[0.12em] text-teal uppercase mb-1">
-            {REFERENCE_INSTITUTION.name}
+            Institution Portal
           </p>
           <h1 className="text-lg font-semibold mb-1">
-            {isRegister ? 'Create registrar account' : 'Credential Center'}
+            {isRegister ? 'Register your institution' : 'Credential Center'}
           </h1>
           <p className="text-sm text-ink-soft mb-6">
             {isRegister
-              ? 'Register a new registrar to issue and manage academic credentials. Your password is stored securely as a bcrypt hash.'
-              : 'Sign in with your registrar account to issue, manage and verify the integrity of academic credentials.'}
+              ? 'Register your college or university to issue verifiable credentials. Each institution has one admin account.'
+              : "Sign in with your institution's admin account to issue, manage and verify the integrity of academic credentials."}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {isRegister && (
-              <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1.5">
-                  Full name
-                </label>
-                <input
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Dr. A. Kumar"
-                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
+              <>
+                <Field
+                  label="Institution name"
+                  value={inst.name}
+                  onChange={updateInst('name')}
+                  placeholder="RV College of Engineering"
                 />
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field
+                    label="Institution code"
+                    value={inst.code}
+                    onChange={updateInst('code')}
+                    placeholder="RVCE"
+                    maxLength={12}
+                  />
+                  <Field label="City" value={inst.city} onChange={updateInst('city')} placeholder="Bengaluru" />
+                </div>
+                <Field
+                  label="Official email"
+                  type="email"
+                  value={inst.email}
+                  onChange={updateInst('email')}
+                  placeholder="registrar@college.edu.in"
+                />
+                <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide pt-2 border-t border-border">
+                  Admin login
+                </p>
+              </>
             )}
-            <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1.5">
-                Registrar username
-              </label>
-              <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="registrar.admin"
-                className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-ink-soft mb-1.5">
-                Password
-              </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
-              />
-            </div>
+            <Field
+              label="Admin username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={isRegister ? 'rvce.admin' : 'admin'}
+            />
+            <Field
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              hint={isRegister ? 'At least 6 characters. Stored securely as a bcrypt hash.' : undefined}
+            />
             {isRegister && (
-              <div>
-                <label className="block text-xs font-medium text-ink-soft mb-1.5">
-                  Confirm password
-                </label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
-                />
-              </div>
+              <Field
+                label="Confirm password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+              />
             )}
             {error && <p className="text-xs text-invalid">{error}</p>}
             <button
@@ -189,18 +211,18 @@ function AdminLogin() {
               {loading ? <Spinner size={15} /> : isRegister ? <Plus size={15} /> : <Lock size={15} />}
               {loading
                 ? isRegister
-                  ? 'Creating account…'
+                  ? 'Registering…'
                   : 'Signing in…'
                 : isRegister
-                ? 'Create account'
+                ? 'Register institution'
                 : 'Sign in'}
             </button>
           </form>
 
           <p className="text-xs text-ink-soft text-center mt-5">
-            {isRegister ? 'Already have an account?' : 'New registrar?'}{' '}
+            {isRegister ? 'Institution already registered?' : 'New college or university?'}{' '}
             <button type="button" onClick={switchMode} className="text-teal font-medium hover:underline">
-              {isRegister ? 'Sign in' : 'Create one'}
+              {isRegister ? 'Sign in' : 'Register your institution'}
             </button>
           </p>
         </div>
@@ -212,7 +234,7 @@ function AdminLogin() {
 // ---- Dashboard ---------------------------------------------------------------
 
 function AdminDashboard() {
-  const { logout } = useAuth();
+  const { institution, logout } = useAuth();
   const { notify } = useToast();
   const [tab, setTab] = useState('issue');
   const [credentials, setCredentials] = useState([]);
@@ -221,9 +243,12 @@ function AdminDashboard() {
 
   const refreshList = () => {
     setLoadingList(true);
-    getAllCredentials()
+    getInstitutionCredentials()
       .then(setCredentials)
-      .catch((err) => notify(err.message, 'error'))
+      .catch((err) => {
+        notify(err.message, 'error');
+        if (err.status === 401) logout();
+      })
       .finally(() => setLoadingList(false));
   };
 
@@ -253,7 +278,7 @@ function AdminDashboard() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold tracking-[0.14em] text-teal uppercase mb-1">
-            {REFERENCE_INSTITUTION.name}
+            {institution.name}
           </p>
           <h1 className="text-xl font-semibold">Credential Center</h1>
           <p className="text-sm text-ink-soft mt-0.5">
@@ -411,6 +436,7 @@ function QuickActions({ onIssue, onManage }) {
 }
 
 function InstitutionPanel() {
+  const { institution } = useAuth();
   return (
     <div className="bg-card border border-border rounded-lg card-shadow p-5 sm:p-6">
       <p className="text-xs font-semibold text-ink-soft uppercase tracking-wide mb-3">Institution</p>
@@ -418,7 +444,7 @@ function InstitutionPanel() {
         <span className="w-9 h-9 rounded-lg bg-teal-soft text-teal flex items-center justify-center shrink-0">
           <Landmark size={16} aria-hidden="true" />
         </span>
-        <p className="text-sm font-semibold">{REFERENCE_INSTITUTION.name}</p>
+        <p className="text-sm font-semibold">{institution.name}</p>
       </div>
       <div className="space-y-1 text-xs text-ink-soft">
         <p className="flex items-center gap-1.5">
@@ -430,10 +456,13 @@ function InstitutionPanel() {
           Credential issuance: Enabled
         </p>
       </div>
-      <p className="text-[10px] text-ink-soft/70 mt-3 border-t border-border pt-2.5">
-        Reference institution for this prototype — not an official integration with Alliance
-        University.
-      </p>
+      <div className="text-[11px] text-ink-soft mt-3 border-t border-border pt-2.5 space-y-0.5">
+        <p>
+          Code: <span className="font-mono">{institution.code}</span>
+          {institution.city && <> · {institution.city}</>}
+        </p>
+        <p>Admin: {institution.username}</p>
+      </div>
     </div>
   );
 }
@@ -466,6 +495,7 @@ function findDuplicate(credentials, form) {
 }
 
 function IssuePanel({ credentials, onIssued, onViewCredential }) {
+  const { institution } = useAuth();
   const { notify } = useToast();
   const [form, setForm] = useState(EMPTY_FORM);
   const [step, setStep] = useState('student');
@@ -500,7 +530,7 @@ function IssuePanel({ credentials, onIssued, onViewCredential }) {
         studentId: form.studentId,
         credentialType: form.credentialType,
         issueDate: form.issueDate,
-        issuer: REFERENCE_INSTITUTION.name,
+        issuer: institution.name,
         txHash: candidate.txHash,
       };
       const bytes = buildCertificateBytes(fields);
@@ -628,6 +658,7 @@ function WizardSteps({ steps, activeIndex }) {
 }
 
 function StepStudentDetails({ form, update, onContinue }) {
+  const { institution } = useAuth();
   const canContinue = form.studentName.trim() && form.studentId.trim();
   return (
     <div>
@@ -661,7 +692,7 @@ function StepStudentDetails({ form, update, onContinue }) {
         </p>
         <div className="flex items-center gap-2">
           <Landmark size={15} className="text-teal shrink-0" aria-hidden="true" />
-          <p className="text-sm font-medium">{REFERENCE_INSTITUTION.name}</p>
+          <p className="text-sm font-medium">{institution.name}</p>
         </div>
         <p className="text-xs text-valid flex items-center gap-1 mt-1.5">
           <Check size={11} aria-hidden="true" />
@@ -747,6 +778,7 @@ function StepReview({
   onBack,
   onConfirm,
 }) {
+  const { institution } = useAuth();
   const showDuplicateWarning = duplicate && !dismissedDuplicate;
 
   return (
@@ -780,7 +812,7 @@ function StepReview({
       <div className="border border-border rounded-lg overflow-hidden mb-5">
         <div className="bg-bg px-4 py-2.5 text-center">
           <p className="text-[11px] font-semibold tracking-[0.12em] text-teal uppercase">
-            {REFERENCE_INSTITUTION.name}
+            {institution.name}
           </p>
         </div>
         <div className="p-4 space-y-3">
@@ -837,6 +869,7 @@ function ReviewRow({ label, value, mono }) {
 }
 
 function SuccessPanel({ result, onViewCredential, onIssueAnother }) {
+  const { institution } = useAuth();
   const { notify } = useToast();
   const [copied, setCopied] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -870,7 +903,7 @@ function SuccessPanel({ result, onViewCredential, onIssueAnother }) {
         <ReviewRow label="Credential" value={result.record.credentialType} />
         <ReviewRow label="Credential ID" value={result.credentialId} mono />
         <ReviewRow label="Status" value="ACTIVE" />
-        <ReviewRow label="Issuer" value={REFERENCE_INSTITUTION.name} />
+        <ReviewRow label="Issuer" value={institution.name} />
       </div>
 
       <div className="border border-border rounded-md p-3.5 mb-5 bg-bg/50">
@@ -1390,7 +1423,7 @@ function RecentActivity({ credentials }) {
 // ---- How issuance works ---------------------------------------------------
 
 const ISSUANCE_STEPS = [
-  { icon: Landmark, title: 'Institution', body: `${REFERENCE_INSTITUTION.name} initiates issuance.` },
+  { icon: Landmark, title: 'Institution', body: 'Your institution initiates issuance.' },
   { icon: FileText, title: 'Create credential', body: 'Student and credential details are recorded.' },
   { icon: ClipboardList, title: 'Generate certificate', body: 'A deterministic certificate document is generated.' },
   { icon: Fingerprint, title: 'Calculate Credential DNA', body: 'A SHA-256 fingerprint of the certificate is computed.' },

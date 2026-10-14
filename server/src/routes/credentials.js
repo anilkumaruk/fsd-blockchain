@@ -2,7 +2,8 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import Credential from '../models/Credential.js';
 import { requireAdmin } from '../middleware/auth.js';
-import { hashCertificate, ISSUER_NAME } from '../certificate.js';
+import Institution from '../models/Institution.js';
+import { hashCertificate } from '../certificate.js';
 
 const router = Router();
 
@@ -32,6 +33,16 @@ router.get('/credentials', async (req, res, next) => {
   }
 });
 
+// GET /api/my/credentials  (institution admin) -> only this institution's credentials
+router.get('/my/credentials', requireAdmin, async (req, res, next) => {
+  try {
+    const list = await Credential.find({ institution: req.institutionId }).sort(NEWEST_FIRST);
+    res.json(list);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/credentials/:credentialId
 router.get('/credentials/:credentialId', async (req, res, next) => {
   try {
@@ -43,9 +54,12 @@ router.get('/credentials/:credentialId', async (req, res, next) => {
   }
 });
 
-// POST /api/credentials  (registrar only) -> issue a new credential
+// POST /api/credentials  (institution admin) -> issue a credential from this institution
 router.post('/credentials', requireAdmin, async (req, res, next) => {
   try {
+    const institution = await Institution.findById(req.institutionId);
+    if (!institution) return res.status(401).json({ message: 'Session expired — please sign in again.' });
+
     const { studentName, studentId, credentialType, issueDate, credentialId, txHash } = req.body || {};
     if (!studentName?.trim() || !studentId?.trim() || !credentialType?.trim()) {
       return res.status(400).json({ message: 'Student name, student ID and credential type are required.' });
@@ -59,12 +73,18 @@ router.post('/credentials', requireAdmin, async (req, res, next) => {
       studentId: studentId.trim(),
       credentialType: credentialType.trim(),
       issueDate: issueDate || today(),
-      issuer: ISSUER_NAME,
+      issuer: institution.name,
       txHash: txHash || newTxHash(),
     };
 
     const hash = await hashCertificate(fields);
-    const record = await Credential.create({ ...fields, hash, status: 'valid', revocation: null });
+    const record = await Credential.create({
+      ...fields,
+      hash,
+      institution: institution._id,
+      status: 'valid',
+      revocation: null,
+    });
 
     res.status(201).json({
       credentialId: record.credentialId,
@@ -79,18 +99,18 @@ router.post('/credentials', requireAdmin, async (req, res, next) => {
   }
 });
 
-// PATCH /api/credentials/:credentialId/revoke  (registrar only)
+// PATCH /api/credentials/:credentialId/revoke  (institution admin, own credentials only)
 router.patch('/credentials/:credentialId/revoke', requireAdmin, async (req, res, next) => {
   try {
     const updated = await Credential.findOneAndUpdate(
-      { credentialId: normalizeId(req.params.credentialId) },
+      { credentialId: normalizeId(req.params.credentialId), institution: req.institutionId },
       {
         status: 'revoked',
         revocation: { reason: req.body?.reason?.trim() || 'No reason provided.', date: today() },
       },
       { new: true }
     );
-    if (!updated) return res.status(404).json({ message: 'Credential not found' });
+    if (!updated) return res.status(404).json({ message: 'Credential not found in your institution.' });
     res.json(updated);
   } catch (err) {
     next(err);

@@ -1,19 +1,22 @@
 import { createContext, useContext, useState } from 'react';
-import { getToken, logout as clearToken } from '../lib/api';
+import { getSession, logout as clearSession } from '../lib/api';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // Restore the session if a JWT is still in sessionStorage (survives refresh).
-  const [adminAuthed, setAdminAuthed] = useState(() => Boolean(getToken()));
+  // The logged-in institution (null when signed out). Restored from
+  // sessionStorage so a page refresh keeps you signed in.
+  const [institution, setInstitution] = useState(() => getSession()?.institution || null);
 
   const logout = () => {
-    clearToken();
-    setAdminAuthed(false);
+    clearSession();
+    setInstitution(null);
   };
 
   return (
-    <AuthContext.Provider value={{ adminAuthed, setAdminAuthed, logout }}>
+    <AuthContext.Provider
+      value={{ adminAuthed: Boolean(institution), institution, signIn: setInstitution, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );

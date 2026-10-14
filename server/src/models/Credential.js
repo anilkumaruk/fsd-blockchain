@@ -15,7 +15,8 @@ const credentialSchema = new mongoose.Schema(
     studentId: { type: String, required: true, trim: true, index: true },
     credentialType: { type: String, required: true, trim: true },
     issueDate: { type: String, required: true }, // YYYY-MM-DD
-    issuer: { type: String, required: true },
+    issuer: { type: String, required: true }, // institution name, printed on the certificate
+    institution: { type: mongoose.Schema.Types.ObjectId, ref: 'Institution', required: true, index: true },
     txHash: { type: String, required: true },
     // SHA-256 of the generated certificate PDF bytes, computed server-side.
     hash: { type: String, required: true, index: true },

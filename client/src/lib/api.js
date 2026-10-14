@@ -7,7 +7,7 @@
 // Verification screen produces a real SHA-256 match against MongoDB.
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
-const TOKEN_KEY = 'cor-admin-token';
+const SESSION_KEY = 'cor-institution-session';
 
 const HEX = '0123456789abcdef';
 
@@ -33,20 +33,25 @@ export function fakeCredentialId() {
 // The "logged in" demo student — used by the Student Portal.
 export const DEMO_STUDENT_ID = 'RGIT21CS014';
 
-// ---- auth token ----------------------------------------------------------
+// ---- session (JWT + logged-in institution) ------------------------------
 
-export function getToken() {
+export function getSession() {
   try {
-    return window.sessionStorage.getItem(TOKEN_KEY);
+    const raw = window.sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
   }
 }
 
-function setToken(token) {
+function getToken() {
+  return getSession()?.token || null;
+}
+
+function setSession(session) {
   try {
-    if (token) window.sessionStorage.setItem(TOKEN_KEY, token);
-    else window.sessionStorage.removeItem(TOKEN_KEY);
+    if (session) window.sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    else window.sessionStorage.removeItem(SESSION_KEY);
   } catch {
     // storage unavailable — login just won't survive a refresh
   }
@@ -74,7 +79,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
 
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    if (res.status === 401 && auth) setToken(null);
+    if (res.status === 401 && auth) setSession(null);
     const err = new Error(data?.message || `Request failed (${res.status})`);
     err.status = res.status;
     throw err;
@@ -84,23 +89,29 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
 
 // ---- API -----------------------------------------------------------------
 
+/** Institution admin login. Returns the institution. */
 export async function login(username, password) {
   const data = await request('/auth/login', { method: 'POST', body: { username, password } });
-  setToken(data.token);
-  return data.admin;
+  setSession(data);
+  return data.institution;
 }
 
-export async function register({ username, password, displayName }) {
+/** Registers a new college / university with its single admin login. */
+export async function registerInstitution({ name, code, city, email, username, password }) {
   const data = await request('/auth/register', {
     method: 'POST',
-    body: { username, password, displayName },
+    body: { name, code, city, email, username, password },
   });
-  setToken(data.token);
-  return data.admin;
+  setSession(data);
+  return data.institution;
 }
 
 export function logout() {
-  setToken(null);
+  setSession(null);
+}
+
+export function getInstitutions() {
+  return request('/auth/institutions');
 }
 
 /**
@@ -122,6 +133,11 @@ export function getCredentialsForStudent(studentId) {
 
 export function getAllCredentials() {
   return request('/credentials');
+}
+
+/** Credentials issued by the logged-in institution only. */
+export function getInstitutionCredentials() {
+  return request('/my/credentials', { auth: true });
 }
 
 export function revokeCredential(credentialId, reason) {
