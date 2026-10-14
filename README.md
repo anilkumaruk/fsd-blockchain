@@ -24,12 +24,15 @@ Any college or university can **register as an institution**. Each institution h
 
 ```
 blockchain-fsd/
+├── api/index.js            Vercel serverless entry (wraps the Express app)
+├── vercel.json             Vercel build and routing config
 ├── client/                 React frontend (same UI as the design project)
 │   └── src/lib/api.js      All HTTP calls to the backend
 └── server/
     ├── .env                Settings: Mongo URI, JWT secret, admin login
     └── src/
-        ├── index.js        Express app and server start-up
+        ├── app.js          Express app (routes, middleware)
+        ├── index.js        Local server start-up (app.listen)
         ├── db.js           MongoDB connection
         ├── seed.js         Creates Alliance University and its demo credentials
         ├── certificate.js  SHA-256 of the certificate PDF
@@ -56,6 +59,21 @@ Student Portal at http://localhost:5173/student. Demo student login: **ananya.sh
 > `npm run seed` deletes every registered institution, student and credential, then recreates only the demo data.
 
 To use **MongoDB Atlas**, set `MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>/chain_of_record` in `server/.env`.
+
+## Deploy to Vercel
+
+The React app is served as static files. The Express API runs as one serverless function, `api/index.js`, which reuses `server/src/app.js`. `vercel.json` sets up the build and routing.
+
+1. **Create a MongoDB Atlas database.** Atlas has a free M0 cluster.
+   - Create a database user.
+   - Under **Network Access**, allow `0.0.0.0/0`. Vercel's IP addresses change, so you can't allow a single address.
+   - Copy the connection string and add the database name: `mongodb+srv://USER:PASS@CLUSTER.mongodb.net/chain_of_record`.
+2. **Load data into Atlas** from your computer: `cd server && MONGODB_URI="<atlas uri>" node --env-file=.env src/seed.js`. The `MONGODB_URI` you pass here overrides the one in `.env`.
+3. **Import the repo in Vercel.** Set **Application Preset** to **Other** and leave **Root Directory** as `./`.
+4. **Add these Environment Variables** in Vercel:
+   - `MONGODB_URI`: the Atlas connection string
+   - `JWT_SECRET`: a long random string, different from your local one
+5. **Deploy.** Check `https://<your-app>.vercel.app/api/health`. It should return `"db":"connected"`.
 
 ## API
 
