@@ -67,7 +67,7 @@ export default function VerificationUI() {
       setVerifiedAt(new Date());
       const state = resolveVerificationState(res.status, query.type);
 
-      if (state === 'verified' || state === 'revoked') {
+      if (state === 'verified' || state === 'revoked' || state === 'invalid') {
         setLastVerifiedCredential(res.details);
       }
 
@@ -82,12 +82,13 @@ export default function VerificationUI() {
         pushVerificationHistory({
           result: state,
           label,
-          credentialId: state === 'verified' || state === 'revoked' ? res.details.credentialId : null,
+          credentialId: ['verified', 'revoked', 'invalid'].includes(state) ? res.details.credentialId : null,
         })
       );
 
       if (res.status === 'valid') notify('Credential verified as valid.', 'success');
       else if (res.status === 'revoked') notify('Credential found but has been revoked.', 'warning');
+      else if (state === 'invalid') notify('The institution has declared this credential invalid.', 'error');
       else if (state === 'mismatch') notify('Document fingerprint does not match.', 'error');
       else notify('No matching credential found.', 'error');
     } catch (err) {
@@ -504,7 +505,9 @@ function QuickDemo({ onPick }) {
             className="flex items-center gap-1.5 text-xs font-mono border border-border rounded-md px-2.5 py-1.5 hover:bg-bg"
           >
             <span
-              className={`w-1.5 h-1.5 rounded-full ${c.status === 'valid' ? 'bg-valid' : 'bg-revoked'}`}
+              className={`w-1.5 h-1.5 rounded-full ${
+                c.status === 'valid' ? 'bg-valid' : c.status === 'invalid' ? 'bg-invalid' : 'bg-revoked'
+              }`}
               aria-hidden="true"
             />
             {c.credentialId}

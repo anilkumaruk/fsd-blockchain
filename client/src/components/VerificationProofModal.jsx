@@ -55,14 +55,19 @@ export default function VerificationProofModal({ credential, onClose }) {
   }, [onClose]);
 
   const revoked = credential.status === 'revoked';
-  const state = revoked ? 'revoked' : authentic === false ? 'mismatch' : 'verified';
+  const invalid = credential.status === 'invalid';
+  const state = invalid ? 'invalid' : revoked ? 'revoked' : authentic === false ? 'mismatch' : 'verified';
 
   const checks = [
     { label: 'Certificate fingerprint recomputed and matches stored record', passed: authentic === true },
     { label: 'Issuer verified', passed: true },
     {
-      label: revoked ? 'Credential has been revoked' : 'Credential is active',
-      passed: !revoked,
+      label: invalid
+        ? 'Credential has been declared invalid'
+        : revoked
+        ? 'Credential has been revoked'
+        : 'Credential is active',
+      passed: !revoked && !invalid,
       tone: revoked ? 'warn' : undefined,
     },
     { label: 'Issuance record exists', passed: true },

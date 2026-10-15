@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import FormField from '../components/FormField';
 import RevocationNotice from '../components/RevocationNotice';
+import { statusLabel } from '../lib/credentialStatus';
 import StatusBadge from '../components/StatusBadge';
 import HashChip from '../components/HashChip';
 import Spinner from '../components/Spinner';
@@ -379,7 +380,7 @@ function StatsRow({ stats }) {
     { label: 'Institutions', value: stats.institutions, icon: Landmark },
   ];
   if (stats.revoked > 0) {
-    tiles.push({ label: 'Revoked', value: stats.revoked, icon: ShieldAlert, accent: true });
+    tiles.push({ label: 'Revoked / invalid', value: stats.revoked, icon: ShieldAlert, accent: true });
   }
 
   return (
@@ -431,7 +432,7 @@ function VerificationStatusCard({ profile }) {
         <p className="text-xs text-ink-soft mt-0.5">
           {profile.allVerified
             ? 'All credentials on this passport are currently valid and unrevoked.'
-            : `${profile.stats.revoked} of ${profile.stats.total} credentials have been revoked and require attention.`}
+            : `${profile.stats.revoked} of ${profile.stats.total} credentials are revoked or invalid and require attention.`}
         </p>
       </div>
     </div>
@@ -444,7 +445,7 @@ function CredentialCard({ credential, notify }) {
   const [copied, setCopied] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [proofOpen, setProofOpen] = useState(false);
-  const revoked = credential.status === 'revoked';
+  const revoked = credential.status !== 'valid';
 
   const handleShare = async () => {
     const url = `${window.location.origin}/verify?credentialId=${credential.credentialId}`;
@@ -496,7 +497,12 @@ function CredentialCard({ credential, notify }) {
       </div>
 
       {revoked && (
-        <RevocationNotice revocation={credential.revocation} issuer={credential.issuer} className="mb-4" />
+        <RevocationNotice
+          status={credential.status}
+          revocation={credential.revocation}
+          issuer={credential.issuer}
+          className="mb-4"
+        />
       )}
 
       <div className="border border-border rounded-md p-3.5 mb-4 bg-bg/50">
@@ -511,7 +517,7 @@ function CredentialCard({ credential, notify }) {
               className={`w-1.5 h-1.5 rounded-full ${revoked ? 'bg-revoked' : 'bg-valid'}`}
               aria-hidden="true"
             />
-            {revoked ? 'REVOKED' : 'VERIFIED'}
+            {revoked ? statusLabel(credential.status).toUpperCase() : 'VERIFIED'}
           </span>
         </div>
 
@@ -528,7 +534,7 @@ function CredentialCard({ credential, notify }) {
             {revoked ? (
               <>
                 <ShieldAlert size={11} className="text-revoked shrink-0" />
-                Credential status: revoked
+                Credential status: {credential.status}
               </>
             ) : (
               <>

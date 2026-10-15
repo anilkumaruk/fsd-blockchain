@@ -91,7 +91,8 @@ The React app is served as static files. The Express API runs as one serverless 
 | GET    | `/api/credentials?studentId=`          | –     | List all credentials, or one student's      |
 | GET    | `/api/credentials/:credentialId`       | –     | Get one credential                          |
 | POST   | `/api/credentials`                     | Admin | Issue a credential as your institution (server computes the hash) |
-| PATCH  | `/api/credentials/:credentialId/revoke`| Admin | Revoke one of your institution's credentials (`category` + `reason` required) |
+| PATCH  | `/api/credentials/:credentialId/status`| Admin | Set `valid`, `revoked` or `invalid` (revoked/invalid need `category` + `reason`); history kept |
+| PATCH  | `/api/credentials/:credentialId/revoke`| Admin | Shorthand for status `revoked` |
 | POST   | `/api/verify`                          | –     | Verify by `credentialId` or by `fileHash`   |
 
 ## How verification works

@@ -7,6 +7,7 @@
 export const VERIFICATION_STATES = {
   VERIFIED: 'verified',
   REVOKED: 'revoked',
+  INVALID: 'invalid',
   MISMATCH: 'mismatch',
   NOT_FOUND: 'not_found',
 };
@@ -19,6 +20,10 @@ const STATE_META = {
   revoked: {
     title: 'Credential Revoked',
     summary: 'This credential exists in the registry but is no longer valid.',
+  },
+  invalid: {
+    title: 'Credential Invalid',
+    summary: 'The issuing institution has declared this credential invalid. It should not be accepted.',
   },
   mismatch: {
     title: 'Document Altered',
@@ -45,6 +50,7 @@ export function getStateMeta(state) {
 export function resolveVerificationState(status, queryType) {
   if (status === 'valid') return VERIFICATION_STATES.VERIFIED;
   if (status === 'revoked') return VERIFICATION_STATES.REVOKED;
+  if (status === 'declared_invalid') return VERIFICATION_STATES.INVALID;
   return queryType === 'hash' ? VERIFICATION_STATES.MISMATCH : VERIFICATION_STATES.NOT_FOUND;
 }
 
@@ -62,8 +68,13 @@ export function resolveVerificationState(status, queryType) {
  * and honest rather than claiming a lookup that didn't happen.
  */
 export function getVerificationChecks(state, queryType, { hasReference = false } = {}) {
-  if (state === VERIFICATION_STATES.VERIFIED || state === VERIFICATION_STATES.REVOKED) {
+  if (
+    state === VERIFICATION_STATES.VERIFIED ||
+    state === VERIFICATION_STATES.REVOKED ||
+    state === VERIFICATION_STATES.INVALID
+  ) {
     const revoked = state === VERIFICATION_STATES.REVOKED;
+    const invalid = state === VERIFICATION_STATES.INVALID;
     return summarize([
       { label: 'Credential exists', passed: true },
       { label: 'Issuer verified', passed: true },
@@ -72,8 +83,12 @@ export function getVerificationChecks(state, queryType, { hasReference = false }
         passed: true,
       },
       {
-        label: revoked ? 'Credential has been revoked' : 'Credential is active',
-        passed: !revoked,
+        label: invalid
+          ? 'Credential has been declared invalid'
+          : revoked
+          ? 'Credential has been revoked'
+          : 'Credential is active',
+        passed: !revoked && !invalid,
         tone: revoked ? 'warn' : undefined,
       },
     ]);

@@ -5,6 +5,7 @@ import { requireAdmin } from '../middleware/auth.js';
 import Institution from '../models/Institution.js';
 import { hashCertificate } from '../certificate.js';
 import { isRevocationReason } from '../../../client/src/lib/revocation.js';
+import { isCredentialStatus } from '../../../client/src/lib/credentialStatus.js';
 
 const router = Router();
 
@@ -107,42 +108,72 @@ router.post('/credentials', requireAdmin, async (req, res, next) => {
   }
 });
 
-// PATCH /api/credentials/:credentialId/revoke  (institution admin, own credentials only)
-// { category, reason } -> category from REVOCATION_REASONS, reason = the explanation shown to verifiers
-router.patch('/credentials/:credentialId/revoke', requireAdmin, async (req, res, next) => {
+// Sets a credential's status (own institution only). Revoked and invalid need a
+// reason category + details; valid (reinstating) takes an optional note.
+async function setStatus(req, res, next, status) {
   try {
     const { category, reason } = req.body || {};
-    if (!isRevocationReason(category)) {
-      return res.status(400).json({ message: 'Choose a reason for revoking this credential.' });
+    const note = reason?.trim() || '';
+    if (!isCredentialStatus(status)) {
+      return res.status(400).json({ message: 'Status must be valid, revoked or invalid.' });
     }
-    if (!reason?.trim() || reason.trim().length < 5) {
-      return res.status(400).json({ message: 'Explain the reason in a few words (at least 5 characters).' });
+    if (status !== 'valid') {
+      if (!isRevocationReason(category)) {
+        return res.status(400).json({ message: 'Choose a reason for this status.' });
+      }
+      if (note.length < 5) {
+        return res.status(400).json({ message: 'Explain the reason in a few words (at least 5 characters).' });
+      }
     }
 
     const institution = await Institution.findById(req.institutionId);
     if (!institution) return res.status(401).json({ message: 'Session expired — please sign in again.' });
 
     const credentialId = normalizeId(req.params.credentialId);
+    const current = await Credential.findOne({ credentialId, institution: institution._id });
+    if (!current) return res.status(404).json({ message: 'Credential not found in your institution.' });
+
+    const unchanged =
+      current.status === status &&
+      (status === 'valid' ||
+        (current.revocation?.category === category && current.revocation?.reason === note));
+    if (unchanged) {
+      return res.status(409).json({ message: `This credential is already ${status}.` });
+    }
+
+    const date = today();
     const updated = await Credential.findOneAndUpdate(
-      { credentialId, institution: institution._id, status: 'valid' },
+      { _id: current._id },
       {
-        status: 'revoked',
-        revocation: { category, reason: reason.trim(), date: today(), revokedBy: institution.name },
+        status,
+        revocation: status === 'valid' ? null : { category, reason: note, date, revokedBy: institution.name },
+        $push: {
+          statusHistory: {
+            status,
+            category: status === 'valid' ? undefined : category,
+            reason: note || undefined,
+            date,
+            by: institution.name,
+          },
+        },
       },
       { new: true }
     );
-    if (!updated) {
-      const existing = await Credential.findOne({ credentialId, institution: institution._id });
-      if (existing?.status === 'revoked') {
-        return res.status(409).json({ message: 'This credential is already revoked.' });
-      }
-      return res.status(404).json({ message: 'Credential not found in your institution.' });
-    }
     res.json(updated);
   } catch (err) {
     next(err);
   }
-});
+}
+
+// PATCH /api/credentials/:credentialId/status  { status, category?, reason? }
+router.patch('/credentials/:credentialId/status', requireAdmin, (req, res, next) =>
+  setStatus(req, res, next, req.body?.status)
+);
+
+// PATCH /api/credentials/:credentialId/revoke  { category, reason } — shorthand for status 'revoked'
+router.patch('/credentials/:credentialId/revoke', requireAdmin, (req, res, next) =>
+  setStatus(req, res, next, 'revoked')
+);
 
 // POST /api/verify  { credentialId } | { fileHash }
 router.post('/verify', async (req, res, next) => {
@@ -169,7 +200,10 @@ router.post('/verify', async (req, res, next) => {
       });
     }
 
-    res.json({ status: match.status === 'revoked' ? 'revoked' : 'valid', details: match });
+    // 'invalid' already means "no matching record", so a credential the institution
+    // has declared invalid is reported as 'declared_invalid'.
+    const status = { valid: 'valid', revoked: 'revoked', invalid: 'declared_invalid' }[match.status];
+    res.json({ status, details: match });
   } catch (err) {
     next(err);
   }

@@ -159,7 +159,7 @@ export function buildResumeBytes(profile, credentials, profileUrl) {
     });
     lines.push({
       text: `  Credential ID: ${c.credentialId} — Status: ${
-        c.status === 'revoked' ? 'Revoked' : 'Verified'
+        { valid: 'Verified', revoked: 'Revoked', invalid: 'Invalid' }[c.status] || c.status
       }`,
       size: 8,
       gap: 20,

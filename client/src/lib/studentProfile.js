@@ -29,7 +29,8 @@ export function buildStudentProfile(account, credentials) {
 
   const total = credentials.length;
   const active = credentials.filter((c) => c.status === 'valid').length;
-  const revoked = credentials.filter((c) => c.status === 'revoked').length;
+  // Revoked and invalid credentials both count as "not active".
+  const revoked = credentials.filter((c) => c.status !== 'valid').length;
 
   return {
     profileId: account.profileId,

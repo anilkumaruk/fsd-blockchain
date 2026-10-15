@@ -1,4 +1,4 @@
-import { CheckCircle2, ShieldAlert, OctagonAlert, SearchX, History, Trash2 } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, ShieldX, OctagonAlert, SearchX, History, Trash2 } from 'lucide-react';
 
 const STORAGE_KEY = 'cor-verifier-history-v1';
 const MAX_ENTRIES = 10;
@@ -6,6 +6,7 @@ const MAX_ENTRIES = 10;
 const ICONS = {
   verified: { Icon: CheckCircle2, className: 'text-valid bg-valid-soft' },
   revoked: { Icon: ShieldAlert, className: 'text-revoked bg-revoked-soft' },
+  invalid: { Icon: ShieldX, className: 'text-invalid bg-invalid-soft' },
   mismatch: { Icon: OctagonAlert, className: 'text-invalid bg-invalid-soft' },
   not_found: { Icon: SearchX, className: 'text-invalid bg-invalid-soft' },
 };
@@ -13,6 +14,7 @@ const ICONS = {
 const RESULT_LABEL = {
   verified: 'Verified',
   revoked: 'Revoked',
+  invalid: 'Invalid',
   mismatch: 'Document altered',
   not_found: 'Not found',
 };

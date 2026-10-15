@@ -176,12 +176,16 @@ export function getInstitutionCredentials() {
   return request('/my/credentials', { auth: 'institution' });
 }
 
-/** Revoke with a reason category (see lib/revocation.js) and an explanation. */
-export function revokeCredential(credentialId, { category, reason }) {
-  return request(`/credentials/${encodeURIComponent(credentialId)}/revoke`, {
+/**
+ * Set a credential's status: 'valid' | 'revoked' | 'invalid'. Revoked and
+ * invalid need a reason category (see lib/revocation.js) and an explanation;
+ * valid takes an optional note.
+ */
+export function setCredentialStatus(credentialId, { status, category, reason }) {
+  return request(`/credentials/${encodeURIComponent(credentialId)}/status`, {
     method: 'PATCH',
     auth: 'institution',
-    body: { category, reason },
+    body: { status, category, reason },
   });
 }
 

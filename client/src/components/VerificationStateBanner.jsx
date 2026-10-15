@@ -1,9 +1,10 @@
-import { ShieldCheck, ShieldAlert, OctagonAlert, SearchX } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, ShieldX, OctagonAlert, SearchX } from 'lucide-react';
 import { getStateMeta } from '../lib/verification';
 
 const CONFIG = {
   verified: { Icon: ShieldCheck, text: 'text-valid' },
   revoked: { Icon: ShieldAlert, text: 'text-revoked' },
+  invalid: { Icon: ShieldX, text: 'text-invalid' },
   mismatch: { Icon: OctagonAlert, text: 'text-invalid' },
   not_found: { Icon: SearchX, text: 'text-invalid' },
 };

@@ -1,4 +1,5 @@
 import { Building2, ShieldAlert, CircleCheck } from 'lucide-react';
+import { statusLabel } from '../lib/credentialStatus';
 
 /**
  * Chronological credential timeline, grouped by issue year (most recent
@@ -37,7 +38,7 @@ export default function AcademicJourney({ yearGroups, title = 'Academic journey'
                       }`}
                     >
                       {c.status === 'valid' ? <CircleCheck size={11} /> : <ShieldAlert size={11} />}
-                      {c.status === 'valid' ? 'Verified' : 'Revoked'}
+                      {c.status === 'valid' ? 'Verified' : statusLabel(c.status)}
                     </p>
                   </div>
                 ))}

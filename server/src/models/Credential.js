@@ -25,8 +25,20 @@ const credentialSchema = new mongoose.Schema(
     txHash: { type: String, required: true },
     // SHA-256 of the generated certificate PDF bytes, computed server-side.
     hash: { type: String, required: true, index: true },
-    status: { type: String, enum: ['valid', 'revoked'], default: 'valid' },
+    status: { type: String, enum: ['valid', 'revoked', 'invalid'], default: 'valid' },
+    // Why the credential is revoked or invalid (null while valid).
     revocation: { type: revocationSchema, default: null },
+    // Every status change, oldest first.
+    statusHistory: [
+      {
+        _id: false,
+        status: { type: String, required: true },
+        category: { type: String },
+        reason: { type: String },
+        date: { type: String, required: true },
+        by: { type: String },
+      },
+    ],
   },
   {
     timestamps: true,

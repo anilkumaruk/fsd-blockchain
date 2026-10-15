@@ -40,7 +40,7 @@ import RevocationNotice from '../components/RevocationNotice';
 import {
   issueCredential,
   getInstitutionCredentials,
-  revokeCredential,
+  setCredentialStatus,
   fakeCredentialId,
   fakeTxHash,
   login,
@@ -48,6 +48,7 @@ import {
 } from '../lib/api';
 import { buildCertificateBytes, computeSha256Hex, downloadCertificatePdf } from '../lib/generateCertificatePdf';
 import { REVOCATION_REASONS, getRevocationReason } from '../lib/revocation';
+import { CREDENTIAL_STATUSES, statusLabel } from '../lib/credentialStatus';
 
 const CREDENTIAL_TYPES = [
   'B.Tech in Computer Science & Engineering',
@@ -254,7 +255,7 @@ function AdminDashboard() {
   const stats = useMemo(() => {
     const total = credentials.length;
     const active = credentials.filter((c) => c.status === 'valid').length;
-    const revoked = credentials.filter((c) => c.status === 'revoked').length;
+    const revoked = credentials.filter((c) => c.status !== 'valid').length;
     const thisYear = new Date().getFullYear();
     const issuedThisYear = credentials.filter(
       (c) => new Date(c.issueDate).getFullYear() === thisYear
@@ -808,7 +809,7 @@ function StepReview({
           </p>
           <p className="text-xs text-ink-soft mb-2.5">
             {duplicate.studentName} already has a "{duplicate.credentialType}" credential dated{' '}
-            {duplicate.issueDate} ({duplicate.status === 'revoked' ? 'revoked' : 'active'},{' '}
+            {duplicate.issueDate} ({duplicate.status === 'valid' ? 'active' : duplicate.status},{' '}
             {duplicate.credentialId}).
           </p>
           <button
@@ -1032,6 +1033,7 @@ function RegistryPanel({ credentials, loading, onSelectCredential }) {
           <option value="all">All statuses</option>
           <option value="valid">Active</option>
           <option value="revoked">Revoked</option>
+          <option value="invalid">Invalid</option>
         </select>
         <select
           value={typeFilter}
@@ -1129,7 +1131,7 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
   }, [onClose]);
 
   if (!credential) return null;
-  const revoked = credential.status === 'revoked';
+  const revoked = credential.status !== 'valid';
 
   const handleDownload = () => {
     downloadCertificatePdf(credential);
@@ -1176,7 +1178,31 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
         </div>
 
         {revoked && (
-          <RevocationNotice revocation={credential.revocation} issuer={credential.issuer} className="mb-4" />
+          <RevocationNotice
+            status={credential.status}
+            revocation={credential.revocation}
+            issuer={credential.issuer}
+            className="mb-4"
+          />
+        )}
+
+        {credential.statusHistory?.length > 0 && (
+          <div className="border border-border rounded-md p-4 mb-4">
+            <p className="text-xs font-semibold mb-2">Status history</p>
+            <ol className="space-y-2">
+              {[...credential.statusHistory].reverse().map((h, i) => (
+                <li key={`${h.date}-${i}`} className="text-xs flex items-start gap-2">
+                  <StatusBadge status={h.status} size="sm" />
+                  <span className="text-ink-soft min-w-0">
+                    {h.date}
+                    {h.by && ` · ${h.by}`}
+                    {h.category && ` · ${getRevocationReason(h.category)?.label || h.category}`}
+                    {h.reason && <span className="block text-ink">{h.reason}</span>}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
         )}
 
         <div className="border border-border rounded-md p-4 mb-5">
@@ -1199,15 +1225,13 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
             <ShieldCheck size={14} aria-hidden="true" />
             Verify credential
           </button>
-          {!revoked && (
-            <button
-              onClick={() => setRevokeOpen(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-invalid border border-invalid/30 rounded-md px-3.5 py-2 hover:bg-invalid-soft"
-            >
-              <Ban size={14} aria-hidden="true" />
-              Revoke credential
-            </button>
-          )}
+          <button
+            onClick={() => setRevokeOpen(true)}
+            className="flex items-center gap-1.5 text-sm font-medium border border-border rounded-md px-3.5 py-2 hover:bg-bg"
+          >
+            <Ban size={14} aria-hidden="true" />
+            Change status
+          </button>
         </div>
       </div>
 
@@ -1215,7 +1239,7 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
         <VerificationProofModal credential={credential} onClose={() => setProofOpen(false)} />
       )}
       {revokeOpen && (
-        <RevokeModal
+        <StatusModal
           credential={credential}
           onClose={() => setRevokeOpen(false)}
           onRevoked={() => {
@@ -1228,16 +1252,30 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
   );
 }
 
-// ---- Revoke modal ------------------------------------------------------------
+// ---- Status modal ------------------------------------------------------------
 
-function RevokeModal({ credential, onClose, onRevoked }) {
+const STATUS_TONE = {
+  valid: 'border-valid bg-valid-soft/50',
+  revoked: 'border-revoked bg-revoked-soft/50',
+  invalid: 'border-invalid bg-invalid-soft/50',
+};
+
+function StatusModal({ credential, onClose, onRevoked }) {
   const { notify } = useToast();
-  const [category, setCategory] = useState('');
-  const [reason, setReason] = useState('');
+  const current = credential.status;
+  const [status, setStatus] = useState(current);
+  const [category, setCategory] = useState(current === 'valid' ? '' : credential.revocation?.category || '');
+  const [reason, setReason] = useState(current === 'valid' ? '' : credential.revocation?.reason || '');
   const [loading, setLoading] = useState(false);
-  const [revokedRecord, setRevokedRecord] = useState(null);
-  const canRevoke = Boolean(category) && reason.trim().length >= 5;
+  const [updated, setUpdated] = useState(null);
   const closeButtonRef = useRef(null);
+
+  const needsReason = status !== 'valid';
+  const unchanged =
+    status === current &&
+    (status === 'valid' ||
+      (category === credential.revocation?.category && reason.trim() === credential.revocation?.reason));
+  const canSave = !unchanged && (!needsReason || (Boolean(category) && reason.trim().length >= 5));
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -1248,43 +1286,47 @@ function RevokeModal({ credential, onClose, onRevoked }) {
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const handleConfirm = async () => {
-    if (!canRevoke) return;
+  const handleSave = async () => {
+    if (!canSave) return;
     setLoading(true);
     try {
-      const updated = await revokeCredential(credential.credentialId, { category, reason });
-      setRevokedRecord(updated);
-      notify(`Credential ${credential.credentialId} has been revoked.`, 'warning');
+      const record = await setCredentialStatus(credential.credentialId, {
+        status,
+        category: needsReason ? category : undefined,
+        reason,
+      });
+      setUpdated(record);
+      notify(`${credential.credentialId} is now ${statusLabel(record.status).toLowerCase()}.`, record.status === 'valid' ? 'success' : 'warning');
     } catch (err) {
-      notify(err.message || 'Failed to revoke credential. Please try again.', 'error');
+      notify(err.message || 'Failed to change status. Please try again.', 'error');
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 px-4 py-8 overflow-y-auto" onClick={onClose}>
       <div
-        className="bg-card border border-border rounded-lg card-shadow w-full max-w-md p-6 animate-modal-in"
+        className="bg-card border border-border rounded-lg card-shadow w-full max-w-md p-6 animate-modal-in my-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        {revokedRecord ? (
+        {updated ? (
           <>
-            <div className="w-10 h-10 rounded-lg bg-revoked-soft flex items-center justify-center mb-3">
-              <ShieldAlert size={18} className="text-revoked" />
+            <div className="mb-3">
+              <StatusBadge status={updated.status} />
             </div>
-            <h3 className="text-base font-semibold mb-1">Credential revoked</h3>
+            <h3 className="text-base font-semibold mb-1">Status updated</h3>
             <p className="text-sm text-ink-soft mb-4">
-              <span className="font-medium text-ink">{credential.credentialId}</span> is no longer
-              active. Future verification attempts will show it as revoked.
+              <span className="font-medium text-ink">{credential.credentialId}</span> is now{' '}
+              {statusLabel(updated.status).toLowerCase()}. Verifiers and the student see this from now on.
             </p>
-            <RevocationNotice
-              revocation={revokedRecord.revocation}
-              issuer={revokedRecord.issuer}
-              className="mb-3"
-            />
-            <p className="text-xs text-ink-soft mb-5">
-              Verifiers and the student will see this reason.
-            </p>
+            {updated.status !== 'valid' && (
+              <RevocationNotice
+                status={updated.status}
+                revocation={updated.revocation}
+                issuer={updated.issuer}
+                className="mb-5"
+              />
+            )}
             <button
               onClick={() => {
                 onRevoked();
@@ -1296,57 +1338,105 @@ function RevokeModal({ credential, onClose, onRevoked }) {
           </>
         ) : (
           <>
-            <div className="w-10 h-10 rounded-lg bg-revoked-soft flex items-center justify-center mb-3">
-              <Ban size={18} className="text-revoked" />
-            </div>
-            <h3 className="text-base font-semibold mb-1">Revoke credential</h3>
-            <div className="text-sm text-ink-soft mb-3 space-y-0.5">
+            <h3 className="text-base font-semibold mb-1">Change credential status</h3>
+            <div className="text-sm text-ink-soft mb-4 space-y-0.5">
               <p>
                 Credential: <span className="font-medium text-ink">{credential.credentialType}</span>
               </p>
               <p>
                 Student: <span className="font-medium text-ink">{credential.studentName}</span>
               </p>
+              <p className="flex items-center gap-1.5">
+                Current status: <StatusBadge status={current} size="sm" />
+              </p>
             </div>
-            <p className="text-xs text-revoked bg-revoked-soft rounded-md px-3 py-2 mb-4">
-              Revoking this credential will cause future verification attempts to show that it is
-              no longer active. This cannot be undone in this prototype.
-            </p>
-            <label className="block text-xs font-medium text-ink-soft mb-1.5">
-              Reason <span className="text-invalid">*</span>
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-revoked/30 focus:border-revoked"
-            >
-              <option value="" disabled>
-                Choose a reason…
-              </option>
-              {REVOCATION_REASONS.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.label}
-                </option>
+
+            <p className="block text-xs font-medium text-ink-soft mb-1.5">New status</p>
+            <div className="space-y-2 mb-4" role="radiogroup" aria-label="New status">
+              {CREDENTIAL_STATUSES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={status === s.id}
+                  onClick={() => setStatus(s.id)}
+                  className={`w-full text-left rounded-md border px-3 py-2.5 transition-colors ${
+                    status === s.id ? STATUS_TONE[s.id] : 'border-border hover:bg-bg'
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={`w-3.5 h-3.5 rounded-full border-2 shrink-0 ${
+                        status === s.id ? 'border-teal bg-teal' : 'border-border bg-white'
+                      }`}
+                      aria-hidden="true"
+                    />
+                    <span className="text-sm font-medium">{s.label}</span>
+                    {s.id === current && <span className="text-[11px] text-ink-soft">(current)</span>}
+                  </span>
+                  <span className="block text-xs text-ink-soft mt-0.5 pl-5.5">{s.meaning}</span>
+                </button>
               ))}
-            </select>
-            <p className="text-[11px] text-ink-soft mt-1 mb-3.5">
-              {category
-                ? getRevocationReason(category).meaning
-                : 'Verifiers and the student see this reason and what it means.'}
-            </p>
-            <label className="block text-xs font-medium text-ink-soft mb-1.5">
-              Details <span className="text-invalid">*</span>
-            </label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-              placeholder="e.g. Student name was misspelled; corrected credential COR-2026-XXXXXX issued."
-              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-revoked/30 focus:border-revoked resize-none"
-            />
-            <p className="text-[11px] text-ink-soft mt-1 mb-5">
-              Shown to anyone who verifies this credential, and to the student.
-            </p>
+            </div>
+
+            {needsReason ? (
+              <>
+                <label className="block text-xs font-medium text-ink-soft mb-1.5">
+                  Reason <span className="text-invalid">*</span>
+                </label>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal"
+                >
+                  <option value="" disabled>
+                    Choose a reason…
+                  </option>
+                  {REVOCATION_REASONS.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-ink-soft mt-1 mb-3.5">
+                  {category
+                    ? getRevocationReason(category).meaning
+                    : 'Verifiers and the student see this reason and what it means.'}
+                </p>
+                <label className="block text-xs font-medium text-ink-soft mb-1.5">
+                  Details <span className="text-invalid">*</span>
+                </label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Student name was misspelled; corrected credential COR-2026-XXXXXX issued."
+                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal resize-none"
+                />
+                <p className="text-[11px] text-ink-soft mt-1 mb-5">
+                  Shown to anyone who verifies this credential, and to the student.
+                </p>
+              </>
+            ) : (
+              current !== 'valid' && (
+                <>
+                  <label className="block text-xs font-medium text-ink-soft mb-1.5">
+                    Note (optional)
+                  </label>
+                  <textarea
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    rows={2}
+                    placeholder="e.g. Appeal upheld; credential reinstated."
+                    className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-teal/30 focus:border-teal resize-none mb-1"
+                  />
+                  <p className="text-[11px] text-ink-soft mb-5">
+                    Kept in the credential's status history. Verifiers will see it as Verified again.
+                  </p>
+                </>
+              )
+            )}
+
             <div className="flex justify-end gap-2">
               <button
                 ref={closeButtonRef}
@@ -1357,12 +1447,12 @@ function RevokeModal({ credential, onClose, onRevoked }) {
                 Cancel
               </button>
               <button
-                onClick={handleConfirm}
-                disabled={loading || !canRevoke}
-                className="flex items-center gap-1.5 text-sm font-medium bg-revoked text-white rounded-md px-4 py-2 hover:bg-revoked/90 disabled:opacity-60"
+                onClick={handleSave}
+                disabled={loading || !canSave}
+                className="flex items-center gap-1.5 text-sm font-medium bg-teal text-white rounded-md px-4 py-2 hover:bg-teal/90 disabled:opacity-60"
               >
                 {loading && <Spinner size={13} />}
-                {loading ? 'Revoking…' : 'Revoke Credential'}
+                {loading ? 'Saving…' : 'Save status'}
               </button>
             </div>
           </>
@@ -1395,10 +1485,10 @@ function buildRecentActivity(credentials) {
       studentName: c.studentName,
       credentialType: c.credentialType,
     });
-    if (c.status === 'revoked' && c.revocation?.date) {
+    if (c.status !== 'valid' && c.revocation?.date) {
       events.push({
-        key: `revoked-${c.credentialId}`,
-        type: 'revoked',
+        key: `${c.status}-${c.credentialId}`,
+        type: c.status,
         date: c.revocation.date,
         studentName: c.studentName,
         credentialType: c.credentialType,
@@ -1441,7 +1531,7 @@ function RecentActivity({ credentials }) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm">
-                  {e.type === 'issued' ? 'Credential issued' : 'Credential revoked'} —{' '}
+                  {e.type === 'issued' ? 'Credential issued' : `Credential ${e.type}`} —{' '}
                   <span className="font-medium">{e.studentName}</span>
                 </p>
                 <p className="text-xs text-ink-soft truncate">{e.credentialType}</p>

@@ -235,7 +235,7 @@ export default function CredentialGraph({ profile, credentials }) {
         <ul className="sr-only">
           {graph.credentials.map((c) => (
             <li key={c.id}>
-              {c.type}, {c.institution}, issued {c.issueYear}, {c.status === 'valid' ? 'verified' : 'revoked'}.
+              {c.type}, {c.institution}, issued {c.issueYear}, {c.status === 'valid' ? 'verified' : c.status}.
             </li>
           ))}
         </ul>
@@ -297,9 +297,9 @@ function InstitutionNode({ institution, refCallback }) {
 }
 
 function GraphNode({ node, refCallback, selected, style, onClick, onHoverStart, onHoverEnd }) {
-  const revoked = node.status === 'revoked';
+  const revoked = node.status !== 'valid';
   const label = `${node.type}, ${node.institution}, issued ${node.issueYear}, ${
-    revoked ? 'revoked' : 'verified'
+    revoked ? node.status : 'verified'
   }. Press for details.`;
 
   return (
@@ -353,7 +353,7 @@ function CredentialListView({ nodes, selectedId, onSelect }) {
   return (
     <ul className="grid sm:grid-cols-2 gap-3">
       {nodes.map((node) => {
-        const revoked = node.status === 'revoked';
+        const revoked = node.status !== 'valid';
         return (
           <li key={node.id}>
             <button
@@ -415,7 +415,7 @@ function GraphLegend({ showInstitution }) {
 // ---- Detail panel ----------------------------------------------------------
 
 function NodeDetailPanel({ credential, onClose, onViewCredential, onViewProof }) {
-  const revoked = credential.status === 'revoked';
+  const revoked = credential.status !== 'valid';
   return (
     <div className="mt-5 border border-border rounded-lg p-4 sm:p-5 bg-bg/50">
       <div className="flex items-start justify-between gap-3 mb-3">

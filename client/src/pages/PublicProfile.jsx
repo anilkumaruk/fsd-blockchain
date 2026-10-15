@@ -301,7 +301,7 @@ function SummaryTile({ value, label }) {
 }
 
 function PublicCredentialCard({ credential }) {
-  const revoked = credential.status === 'revoked';
+  const revoked = credential.status !== 'valid';
   return (
     <div
       className={`bg-card border rounded-lg card-shadow p-5 ${revoked ? 'border-revoked/25' : 'border-border'}`}
@@ -330,7 +330,8 @@ function PublicCredentialCard({ credential }) {
       {revoked && (
         <p className="bg-revoked-soft text-revoked text-xs rounded-md px-3 py-2 mb-3">
           This credential exists in the record but is no longer active.
-          {credential.revocation?.date && ` Revoked ${credential.revocation.date}.`}
+          {credential.revocation?.date &&
+            ` ${credential.status === 'invalid' ? 'Declared invalid' : 'Revoked'} ${credential.revocation.date}.`}
         </p>
       )}
 

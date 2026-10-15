@@ -11,6 +11,7 @@ import { resolveVerificationState, getVerificationChecks } from '../lib/verifica
 const CARD_TONE = {
   verified: 'bg-valid-soft/40 border-valid/25',
   revoked: 'bg-revoked-soft/50 border-revoked/25',
+  invalid: 'bg-invalid-soft/50 border-invalid/25',
   mismatch: 'bg-invalid-soft/50 border-invalid/25',
   not_found: 'bg-invalid-soft/40 border-invalid/20',
 };
@@ -33,7 +34,7 @@ export default function VerificationResult({ result, queryType, verifiedAt, refe
   const hasReference = state === 'mismatch' && Boolean(referenceCredential);
   const { checks, passed, total } = getVerificationChecks(state, queryType, { hasReference });
   const d = result.details;
-  const showRecord = state === 'verified' || state === 'revoked';
+  const showRecord = state === 'verified' || state === 'revoked' || state === 'invalid';
   const [proofOpen, setProofOpen] = useState(false);
 
   return (
@@ -72,7 +73,9 @@ export default function VerificationResult({ result, queryType, verifiedAt, refe
 
             <CredentialDNA hash={d.hash} expandable />
 
-            {state === 'revoked' && <RevocationNotice revocation={d.revocation} issuer={d.issuer} />}
+            {(state === 'revoked' || state === 'invalid') && (
+              <RevocationNotice status={d.status} revocation={d.revocation} issuer={d.issuer} />
+            )}
 
             <div className="flex items-center justify-between gap-3 pt-1">
               {verifiedAt && (
