@@ -4,6 +4,7 @@ import Credential from '../models/Credential.js';
 import { requireAdmin } from '../middleware/auth.js';
 import Institution from '../models/Institution.js';
 import { hashCertificate } from '../certificate.js';
+import { isRevocationReason } from '../../../client/src/lib/revocation.js';
 
 const router = Router();
 
@@ -107,17 +108,36 @@ router.post('/credentials', requireAdmin, async (req, res, next) => {
 });
 
 // PATCH /api/credentials/:credentialId/revoke  (institution admin, own credentials only)
+// { category, reason } -> category from REVOCATION_REASONS, reason = the explanation shown to verifiers
 router.patch('/credentials/:credentialId/revoke', requireAdmin, async (req, res, next) => {
   try {
+    const { category, reason } = req.body || {};
+    if (!isRevocationReason(category)) {
+      return res.status(400).json({ message: 'Choose a reason for revoking this credential.' });
+    }
+    if (!reason?.trim() || reason.trim().length < 5) {
+      return res.status(400).json({ message: 'Explain the reason in a few words (at least 5 characters).' });
+    }
+
+    const institution = await Institution.findById(req.institutionId);
+    if (!institution) return res.status(401).json({ message: 'Session expired — please sign in again.' });
+
+    const credentialId = normalizeId(req.params.credentialId);
     const updated = await Credential.findOneAndUpdate(
-      { credentialId: normalizeId(req.params.credentialId), institution: req.institutionId },
+      { credentialId, institution: institution._id, status: 'valid' },
       {
         status: 'revoked',
-        revocation: { reason: req.body?.reason?.trim() || 'No reason provided.', date: today() },
+        revocation: { category, reason: reason.trim(), date: today(), revokedBy: institution.name },
       },
       { new: true }
     );
-    if (!updated) return res.status(404).json({ message: 'Credential not found in your institution.' });
+    if (!updated) {
+      const existing = await Credential.findOne({ credentialId, institution: institution._id });
+      if (existing?.status === 'revoked') {
+        return res.status(409).json({ message: 'This credential is already revoked.' });
+      }
+      return res.status(404).json({ message: 'Credential not found in your institution.' });
+    }
     res.json(updated);
   } catch (err) {
     next(err);

@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { BadgeCheck, Building2, CalendarDays, Ban, Clock, Eye, Hash } from 'lucide-react';
+import { BadgeCheck, Building2, CalendarDays, Clock, Eye, Hash, XCircle } from 'lucide-react';
 import VerificationStateBanner from './VerificationStateBanner';
 import VerificationChecks from './VerificationChecks';
 import CredentialDNA from './CredentialDNA';
 import HashChip from './HashChip';
 import VerificationProofModal from './VerificationProofModal';
+import RevocationNotice from './RevocationNotice';
 import { resolveVerificationState, getVerificationChecks } from '../lib/verification';
 
 const CARD_TONE = {
@@ -71,14 +72,7 @@ export default function VerificationResult({ result, queryType, verifiedAt, refe
 
             <CredentialDNA hash={d.hash} expandable />
 
-            {state === 'revoked' && (
-              <div className="bg-revoked-soft text-revoked text-xs rounded-md px-3 py-2 flex items-start gap-1.5">
-                <Ban size={13} className="shrink-0 mt-0.5" />
-                <span>
-                  Revoked on {d.revocation?.date} — {d.revocation?.reason}
-                </span>
-              </div>
-            )}
+            {state === 'revoked' && <RevocationNotice revocation={d.revocation} issuer={d.issuer} />}
 
             <div className="flex items-center justify-between gap-3 pt-1">
               {verifiedAt && (
@@ -119,25 +113,34 @@ export default function VerificationResult({ result, queryType, verifiedAt, refe
               </div>
             )}
 
-            <p className="text-xs text-ink-soft">
-              This fingerprint doesn't match a registered credential. That proves the submitted
-              file's bytes differ from what was originally issued — it does not, by itself,
-              identify who or what changed them. The document may have been modified after
-              issuance.
-            </p>
+            <RejectionReason
+              reason="The uploaded file's fingerprint does not match any credential that was issued."
+              causes={[
+                'The certificate was edited after it was issued (name, course, date or ID changed)',
+                'The file is a scanned, re-saved or printed copy, not the original download',
+                'The certificate was never issued through this system',
+              ]}
+              next="Ask the student for the original downloaded PDF, or verify using the Credential ID instead."
+            />
           </div>
         )}
 
         {state === 'not_found' && (
-          <div className="border-t border-border pt-4 space-y-1.5">
-            <p className="text-xs text-ink-soft">
-              No credential record matches ID{' '}
-              <span className="font-mono text-ink">{d.submittedId}</span>.
-            </p>
-            <p className="text-xs text-ink-soft">
-              This system cannot establish authenticity for unrecorded information. Verification
-              could not be completed.
-            </p>
+          <div className="border-t border-border pt-4">
+            <RejectionReason
+              reason={
+                <>
+                  No credential with ID <span className="font-mono">{d.submittedId}</span> exists in
+                  the registry.
+                </>
+              }
+              causes={[
+                'The Credential ID was mistyped — check each character',
+                'The certificate was not issued through this system',
+                'The certificate may not be genuine',
+              ]}
+              next="Check the ID printed on the certificate, or contact the issuing institution."
+            />
           </div>
         )}
       </div>
@@ -145,6 +148,29 @@ export default function VerificationResult({ result, queryType, verifiedAt, refe
       {proofOpen && showRecord && (
         <VerificationProofModal credential={d} onClose={() => setProofOpen(false)} />
       )}
+    </div>
+  );
+}
+
+/** Why a verification failed: the reason, the likely causes, and what to do next. */
+function RejectionReason({ reason, causes, next }) {
+  return (
+    <div className="bg-invalid-soft text-invalid rounded-md px-3.5 py-3">
+      <p className="text-xs font-semibold flex items-center gap-1.5">
+        <XCircle size={13} className="shrink-0" aria-hidden="true" />
+        Reason for rejection
+      </p>
+      <p className="text-xs mt-1.5 text-ink">{reason}</p>
+      <p className="text-xs font-semibold mt-2.5 text-ink">Possible causes</p>
+      <ul className="text-xs mt-1 text-ink-soft list-disc pl-4 space-y-0.5">
+        {causes.map((c) => (
+          <li key={c}>{c}</li>
+        ))}
+      </ul>
+      <p className="text-xs mt-2.5 text-ink-soft">
+        <span className="font-semibold text-ink">What to do: </span>
+        {next}
+      </p>
     </div>
   );
 }

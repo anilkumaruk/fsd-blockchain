@@ -22,6 +22,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import FormField from '../components/FormField';
+import RevocationNotice from '../components/RevocationNotice';
 import StatusBadge from '../components/StatusBadge';
 import HashChip from '../components/HashChip';
 import Spinner from '../components/Spinner';
@@ -494,10 +495,8 @@ function CredentialCard({ credential, notify }) {
         </div>
       </div>
 
-      {revoked && credential.revocation && (
-        <div className="bg-revoked-soft text-revoked text-xs rounded-md px-3 py-2 mb-4">
-          Revoked on {credential.revocation.date} — {credential.revocation.reason}
-        </div>
+      {revoked && (
+        <RevocationNotice revocation={credential.revocation} issuer={credential.issuer} className="mb-4" />
       )}
 
       <div className="border border-border rounded-md p-3.5 mb-4 bg-bg/50">

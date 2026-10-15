@@ -36,6 +36,7 @@ import Spinner from '../components/Spinner';
 import CredentialDNA, { shortenHash } from '../components/CredentialDNA';
 import VerificationProofModal from '../components/VerificationProofModal';
 import FormField from '../components/FormField';
+import RevocationNotice from '../components/RevocationNotice';
 import {
   issueCredential,
   getInstitutionCredentials,
@@ -46,6 +47,7 @@ import {
   registerInstitution,
 } from '../lib/api';
 import { buildCertificateBytes, computeSha256Hex, downloadCertificatePdf } from '../lib/generateCertificatePdf';
+import { REVOCATION_REASONS } from '../lib/revocation';
 
 const CREDENTIAL_TYPES = [
   'B.Tech in Computer Science & Engineering',
@@ -1173,11 +1175,8 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
           <ReviewRow label="Issue date" value={credential.issueDate} />
         </div>
 
-        {revoked && credential.revocation && (
-          <div className="bg-revoked-soft text-revoked text-xs rounded-md px-3 py-2.5 mb-4">
-            <p className="font-medium mb-0.5">Revoked {credential.revocation.date}</p>
-            <p>{credential.revocation.reason}</p>
-          </div>
+        {revoked && (
+          <RevocationNotice revocation={credential.revocation} issuer={credential.issuer} className="mb-4" />
         )}
 
         <div className="border border-border rounded-md p-4 mb-5">
@@ -1233,9 +1232,11 @@ function CredentialDetailPanel({ credentialId, credentials, onClose, onRevoked }
 
 function RevokeModal({ credential, onClose, onRevoked }) {
   const { notify } = useToast();
+  const [category, setCategory] = useState('');
   const [reason, setReason] = useState('');
   const [loading, setLoading] = useState(false);
   const [revokedRecord, setRevokedRecord] = useState(null);
+  const canRevoke = Boolean(category) && reason.trim().length >= 5;
   const closeButtonRef = useRef(null);
 
   useEffect(() => {
@@ -1248,10 +1249,10 @@ function RevokeModal({ credential, onClose, onRevoked }) {
   }, [onClose]);
 
   const handleConfirm = async () => {
-    if (!reason.trim()) return;
+    if (!canRevoke) return;
     setLoading(true);
     try {
-      const updated = await revokeCredential(credential.credentialId, reason);
+      const updated = await revokeCredential(credential.credentialId, { category, reason });
       setRevokedRecord(updated);
       notify(`Credential ${credential.credentialId} has been revoked.`, 'warning');
     } catch (err) {
@@ -1276,13 +1277,14 @@ function RevokeModal({ credential, onClose, onRevoked }) {
               <span className="font-medium text-ink">{credential.credentialId}</span> is no longer
               active. Future verification attempts will show it as revoked.
             </p>
-            <div className="space-y-2 border border-border rounded-md p-3.5 bg-bg/50 mb-5">
-              <ReviewRow label="Revocation date" value={revokedRecord.revocation.date} />
-              <div>
-                <p className="text-xs text-ink-soft mb-0.5">Reason</p>
-                <p className="text-sm">{revokedRecord.revocation.reason}</p>
-              </div>
-            </div>
+            <RevocationNotice
+              revocation={revokedRecord.revocation}
+              issuer={revokedRecord.issuer}
+              className="mb-3"
+            />
+            <p className="text-xs text-ink-soft mb-5">
+              Verifiers and the student will see this reason.
+            </p>
             <button
               onClick={() => {
                 onRevoked();
@@ -1311,15 +1313,35 @@ function RevokeModal({ credential, onClose, onRevoked }) {
               no longer active. This cannot be undone in this prototype.
             </p>
             <label className="block text-xs font-medium text-ink-soft mb-1.5">
-              Revocation reason <span className="text-invalid">*</span>
+              Reason <span className="text-invalid">*</span>
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-revoked/30 focus:border-revoked mb-3.5"
+            >
+              <option value="" disabled>
+                Choose a reason…
+              </option>
+              {REVOCATION_REASONS.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <label className="block text-xs font-medium text-ink-soft mb-1.5">
+              Details <span className="text-invalid">*</span>
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={3}
-              placeholder="e.g. Issued in error, academic integrity violation, degree rescinded…"
-              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-revoked/30 focus:border-revoked mb-5 resize-none"
+              placeholder="e.g. Student name was misspelled; corrected credential COR-2026-XXXXXX issued."
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-revoked/30 focus:border-revoked resize-none"
             />
+            <p className="text-[11px] text-ink-soft mt-1 mb-5">
+              Shown to anyone who verifies this credential, and to the student.
+            </p>
             <div className="flex justify-end gap-2">
               <button
                 ref={closeButtonRef}
@@ -1331,7 +1353,7 @@ function RevokeModal({ credential, onClose, onRevoked }) {
               </button>
               <button
                 onClick={handleConfirm}
-                disabled={loading || !reason.trim()}
+                disabled={loading || !canRevoke}
                 className="flex items-center gap-1.5 text-sm font-medium bg-revoked text-white rounded-md px-4 py-2 hover:bg-revoked/90 disabled:opacity-60"
               >
                 {loading && <Spinner size={13} />}

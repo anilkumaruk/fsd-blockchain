@@ -2,8 +2,10 @@ import mongoose from 'mongoose';
 
 const revocationSchema = new mongoose.Schema(
   {
-    reason: { type: String, required: true },
+    category: { type: String }, // one of REVOCATION_REASONS (client/src/lib/revocation.js)
+    reason: { type: String, required: true }, // the institution's explanation
     date: { type: String, required: true }, // YYYY-MM-DD, same format the UI renders
+    revokedBy: { type: String }, // institution name at the time of revocation
   },
   { _id: false }
 );

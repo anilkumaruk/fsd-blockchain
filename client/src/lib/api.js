@@ -176,11 +176,12 @@ export function getInstitutionCredentials() {
   return request('/my/credentials', { auth: 'institution' });
 }
 
-export function revokeCredential(credentialId, reason) {
+/** Revoke with a reason category (see lib/revocation.js) and an explanation. */
+export function revokeCredential(credentialId, { category, reason }) {
   return request(`/credentials/${encodeURIComponent(credentialId)}/revoke`, {
     method: 'PATCH',
     auth: 'institution',
-    body: { reason },
+    body: { category, reason },
   });
 }
 

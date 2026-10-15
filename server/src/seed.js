@@ -38,7 +38,9 @@ const seedCredentials = [
     txHash: txHash(),
     issuer: ISSUER_NAME,
     revocation: {
+      category: 'duplicate',
       reason: 'Issued in error — duplicate record for merged student file.',
+      revokedBy: ISSUER_NAME,
       date: '2023-09-02',
     },
   },
@@ -89,7 +91,9 @@ const seedCredentials = [
     txHash: txHash(),
     issuer: ISSUER_NAME,
     revocation: {
+      category: 'academic_misconduct',
       reason: 'Academic integrity violation confirmed after appeal process.',
+      revokedBy: ISSUER_NAME,
       date: '2024-01-11',
     },
   },
