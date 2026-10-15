@@ -47,7 +47,7 @@ import {
   registerInstitution,
 } from '../lib/api';
 import { buildCertificateBytes, computeSha256Hex, downloadCertificatePdf } from '../lib/generateCertificatePdf';
-import { REVOCATION_REASONS } from '../lib/revocation';
+import { REVOCATION_REASONS, getRevocationReason } from '../lib/revocation';
 
 const CREDENTIAL_TYPES = [
   'B.Tech in Computer Science & Engineering',
@@ -1318,7 +1318,7 @@ function RevokeModal({ credential, onClose, onRevoked }) {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-revoked/30 focus:border-revoked mb-3.5"
+              className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-revoked/30 focus:border-revoked"
             >
               <option value="" disabled>
                 Choose a reason…
@@ -1329,6 +1329,11 @@ function RevokeModal({ credential, onClose, onRevoked }) {
                 </option>
               ))}
             </select>
+            <p className="text-[11px] text-ink-soft mt-1 mb-3.5">
+              {category
+                ? getRevocationReason(category).meaning
+                : 'Verifiers and the student see this reason and what it means.'}
+            </p>
             <label className="block text-xs font-medium text-ink-soft mb-1.5">
               Details <span className="text-invalid">*</span>
             </label>
